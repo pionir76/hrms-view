@@ -1,0 +1,1902 @@
+/* HRMS 공통 스타일 - 레이아웃 및 기본 요소 */
+
+/* Pretendard — 한글/영문/숫자 모두 깔끔하게 나오는 시스템 공통 폰트.
+   CDN 로드가 안 되는 폐쇄망 환경이면 자동으로 Malgun Gothic 등 OS 기본 글꼴로
+   대체되므로(font-family 폴백), 오프라인이어도 깨지지 않는다. */
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css");
+
+/* 디자인 토큰 (2026-09-17 앱 전체 개편 — 자료 조회 화면 디자인을 전 화면으로 확장)
+   옅은 파랑·보라 그라데이션 배경 위에 흰 카드(둥근 모서리 + 부드러운 그림자),
+   강조색은 파랑→보라 그라데이션(--accent-grad) 하나로 통일한다. */
+:root {
+  --color-bg: #f3f5fa;
+  --color-surface: #ffffff;
+  --color-border: #e4e8f0;
+  --color-border-soft: #edf0f6;
+  --color-border-strong: #c7cedb;
+  --color-text: #172033;
+  --color-text-sub: #4a5468;
+  --color-text-muted: #6a7489;
+  --color-text-faint: #a3abbb;
+  --color-primary: #2f5bea;
+  --color-primary-dark: #2344c4;
+  --color-primary-soft: #eef3ff;
+  --color-field-bg: #f8f9fc;
+  --color-row-hover: #f5f8ff;
+  --color-brand-navy: #002c5f; /* 현대 네이비 — 로고·시스템명·선택 메뉴 */
+
+  --accent-grad: linear-gradient(135deg, #2f6bff 0%, #6a4cf5 100%);
+  --accent-grad-soft: linear-gradient(135deg, rgba(79, 124, 255, 0.1), rgba(140, 92, 255, 0.1));
+  --accent-shadow: 0 8px 18px -8px rgba(60, 80, 240, 0.7);
+
+  --shadow-card: 0 1px 2px rgba(20, 32, 60, 0.05), 0 10px 30px -12px rgba(30, 50, 110, 0.18);
+  --shadow-pop: 0 1px 2px rgba(20, 32, 60, 0.08), 0 3px 10px -4px rgba(20, 32, 60, 0.18);
+
+  --topbar-height: 64px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+
+  --field-bg-disabled: #f2f4f7;
+  --field-focus-ring: 0 0 0 3px rgba(47, 91, 234, 0.14);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: "Pretendard", "Malgun Gothic", "Segoe UI", -apple-system, sans-serif;
+  background:
+    radial-gradient(900px 420px at 8% -8%, rgba(79, 124, 255, 0.14), transparent 60%),
+    radial-gradient(800px 420px at 100% 0%, rgba(140, 92, 255, 0.1), transparent 60%),
+    linear-gradient(180deg, #f5f7fc 0%, #eef1f7 100%);
+  background-color: var(--color-bg);
+  background-attachment: fixed;
+  color: var(--color-text);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font-family: inherit;
+}
+
+/* ---------- App shell ---------- */
+
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------- 상단바 (common/js/layout.js가 그리는 마크업, 2026-09-17 개편) ----------
+   좌: 네이비 로고 | "남양연구소" / "냉동기 중앙통제시스템" 2단
+   우: 메인 메뉴(선택은 밑줄) · 사용자 버튼(드롭다운: 내 정보 / 설정 / 로그아웃) | 날짜·시각
+   반투명 흰색 + 블러, 스크롤해도 위에 붙어 있다. 1366px 폭까지 한 줄에 들어가도록, 좁아지면 덜 중요한 것부터 숨긴다. */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  height: var(--topbar-height);
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(228, 232, 240, 0.95);
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 0 24px;
+}
+
+.topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+/* 로고 원본은 투명 배경의 흰색이라 밝은 상단바에서 안 보인다 — mask로 네이비를 입힌다 */
+.topbar-logo {
+  width: 44px;
+  height: 26px;
+  background-color: var(--color-brand-navy);
+  -webkit-mask: url("../../assets/logo_master.png") center / contain no-repeat;
+  mask: url("../../assets/logo_master.png") center / contain no-repeat;
+}
+
+.topbar-title {
+  display: flex;
+  flex-direction: column;
+  padding-left: 12px;
+  border-left: 1px solid var(--color-border);
+  line-height: 1.2;
+}
+
+.topbar-title-sub {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--color-text-faint);
+}
+
+.topbar-title-main {
+  font-size: 15.5px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--color-brand-navy);
+  white-space: nowrap;
+}
+
+/* 메뉴 — 상단바 전체 높이를 차지해서 밑줄이 상단바 아래 끝선에 붙는다 */
+.topbar-menu {
+  margin-left: auto;
+  align-self: stretch;
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+}
+
+.menu-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  transition: color 0.12s ease;
+}
+
+.menu-item::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: -1px;
+  height: 3px;
+  border-radius: 3px 3px 0 0;
+  background: transparent;
+  transition: background-color 0.15s ease;
+}
+
+.menu-item:hover {
+  color: var(--color-text);
+}
+
+.menu-item:hover::after {
+  background: #d8def0;
+}
+
+.menu-item.active {
+  color: var(--color-brand-navy);
+  font-weight: 800;
+}
+
+.menu-item.active::after {
+  background: var(--accent-grad);
+}
+
+/* 사용자 영역 — 버튼 하나(아바타·이름·담당업무·소속팀·▾)를 누르면 드롭다운 */
+.topbar-user {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.topbar-user-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px 6px 6px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.topbar-user-btn:hover,
+.topbar-user.open .topbar-user-btn {
+  background: #f1f4fa;
+}
+
+.topbar-avatar {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1d4f91, var(--color-brand-navy));
+  font-size: 13px;
+  font-weight: 800;
+  color: #fff;
+}
+
+.topbar-user-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.topbar-user-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--color-text);
+  white-space: nowrap;
+}
+
+.topbar-user-team {
+  font-size: 11.5px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.topbar-role {
+  padding: 1px 7px;
+  border-radius: 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.tb-role-admin { background: #fff1e6; color: #c2410c; }
+.tb-role-1 { background: #eeefff; color: #3b3fd8; }
+.tb-role-2 { background: #eef3ff; color: #2f5bea; }
+.tb-role-3 { background: #e8f8f6; color: #0f8f86; }
+.tb-role-4 { background: #f1f3f7; color: #6a7489; }
+
+.topbar-caret {
+  width: 7px;
+  height: 7px;
+  margin: 0 2px 3px;
+  border-right: 1.8px solid #8a93a6;
+  border-bottom: 1.8px solid #8a93a6;
+  transform: rotate(45deg);
+  transition: transform 0.15s ease;
+}
+
+.topbar-user.open .topbar-caret {
+  margin-bottom: -3px;
+  transform: rotate(-135deg);
+}
+
+.topbar-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 60;
+  width: 220px;
+  padding: 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 16px 36px -12px rgba(16, 24, 40, 0.25);
+}
+
+.topbar-dropdown[hidden] {
+  display: none;
+}
+
+.topbar-dropdown-head {
+  margin-bottom: 4px;
+  padding: 10px 10px 8px;
+  border-bottom: 1px solid var(--color-border-soft);
+}
+
+.topbar-dropdown-head b {
+  display: block;
+  font-size: 13.5px;
+}
+
+.topbar-dropdown-head span {
+  font-size: 11.5px;
+  color: var(--color-text-muted);
+}
+
+.topbar-dropdown-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-sub);
+  text-align: left;
+  cursor: pointer;
+}
+
+.topbar-dropdown-item svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.topbar-dropdown-item:hover {
+  background: #f3f6ff;
+  color: var(--color-primary);
+}
+
+.topbar-dropdown-item.danger {
+  color: #e0364d;
+}
+
+.topbar-dropdown-item.danger:hover {
+  background: #fff0f1;
+  color: #c4261d;
+}
+
+.topbar-divider {
+  width: 1px;
+  height: 28px;
+  flex-shrink: 0;
+  background: var(--color-border);
+}
+
+/* 시각만 굵게 */
+.topbar-clock {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-sub);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.topbar-clock b {
+  margin-left: 4px;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+/* 좁은 화면: 아바타·소속팀 → 남양연구소 줄·날짜 순으로 숨기고 메뉴 간격을 줄인다(1366px까지 한 줄) */
+@media (max-width: 1560px) {
+  .topbar {
+    gap: 14px;
+    padding: 0 18px;
+  }
+
+  .topbar-avatar,
+  .topbar-user-team {
+    display: none;
+  }
+
+  .menu-item {
+    padding: 0 9px;
+    font-size: 13.5px;
+  }
+
+  .menu-item::after {
+    left: 9px;
+    right: 9px;
+  }
+}
+
+@media (max-width: 1300px) {
+  .topbar-title-sub,
+  .topbar-clock,
+  .topbar-divider {
+    display: none;
+  }
+}
+
+/* ---------- 상단바에서 여는 모달 (로그아웃 확인 · 내 정보) ---------- */
+
+.layout-modal {
+  z-index: 200;
+}
+
+.layout-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.layout-modal-eyebrow {
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+}
+
+.layout-modal-title {
+  margin: 2px 0 0;
+  font-size: 17px;
+}
+
+.modal-box.layout-logout-box {
+  width: 380px;
+}
+
+.modal-box.layout-myinfo-box {
+  width: 560px;
+}
+
+/* ----- 내 정보 (읽기 전용) ----- */
+
+.modal-box.layout-profile-box {
+  width: 700px;
+  max-width: calc(100vw - 32px);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.layout-profile-body {
+  overflow-y: auto;
+}
+
+.profile-file svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* 프로필 카드 오른쪽 연락처1·2 */
+.profile-phones {
+  display: grid;
+  gap: 4px;
+  margin: 0 4px 0 auto;
+  padding-left: 18px;
+  border-left: 1px solid rgba(0, 44, 95, 0.12);
+}
+
+.profile-phones div {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.profile-phones dt {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
+.profile-phones dd {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* 항목 이름 / 값 두 줄 격자 — 표 테두리 없이 간단하게 */
+.profile-info {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 20px;
+  margin: 0 0 18px;
+  padding: 2px 4px;
+}
+
+.profile-info div {
+  min-width: 0;
+}
+
+.profile-info dt {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
+.profile-info dd {
+  margin: 2px 0 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 2px 9px;
+  border: none;
+  border-radius: 8px;
+  background: #f3f6ff;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-primary);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-file:hover {
+  background: #e8eeff;
+}
+
+.profile-equip-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 13.5px;
+  font-weight: 800;
+}
+
+.profile-equip-head em {
+  padding: 1px 8px;
+  border-radius: 99px;
+  background: #eef3ff;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.profile-equip-head em:empty {
+  display: none;
+}
+
+/* 담당장비가 많아도(최대 106대) 모달이 끝없이 길어지지 않게 이 영역만 스크롤 */
+.profile-equip {
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+.profile-equip-region {
+  position: sticky;
+  top: 0;
+  padding: 7px 12px;
+  background: #f8f9fc;
+  border-bottom: 1px solid var(--color-border-soft);
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--color-text-muted);
+}
+
+.profile-equip-row {
+  display: flex;
+  gap: 10px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--color-border-soft);
+  font-size: 13px;
+}
+
+.profile-equip-row:last-child {
+  border-bottom: none;
+}
+
+.profile-equip-row b {
+  flex-shrink: 0;
+  width: 160px;
+}
+
+.profile-equip-row span {
+  font-size: 12.5px;
+  color: var(--color-text-sub);
+}
+
+.profile-equip-empty {
+  padding: 16px;
+  font-size: 13px;
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+/* 내 정보 모달 안의 아바타는 크게, 좁은 화면에서도 숨기지 않는다 */
+.layout-modal .topbar-avatar.myinfo-avatar {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  font-size: 17px;
+}
+
+.myinfo-profile {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 14px;
+  padding: 14px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(0, 44, 95, 0.06), rgba(47, 91, 234, 0.05));
+}
+
+.myinfo-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.myinfo-meta {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.myinfo-sec {
+  margin-bottom: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.myinfo-sec-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.myinfo-sec-head h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 13.5px;
+}
+
+.myinfo-sec-head h3::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-grad);
+}
+
+.myinfo-sec-btn {
+  margin-left: auto;
+  height: 30px;
+  padding: 0 14px;
+  font-size: 12.5px;
+}
+
+.myinfo-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 12px;
+}
+
+.myinfo-field {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 10px;
+}
+
+.myinfo-grid .myinfo-field {
+  margin-bottom: 0;
+}
+
+.myinfo-field label {
+  margin-bottom: 4px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
+.myinfo-field input {
+  width: 100%;
+  height: 34px;
+  border-radius: 9px;
+}
+
+/* ----- 비밀번호 변경 단계 (section[data-step]: idle → current → new → done) ----- */
+
+.myinfo-pw-step,
+.myinfo-steps {
+  display: none;
+}
+
+#myInfoPwSection[data-step="idle"] .myinfo-sec-head {
+  margin-bottom: 0;
+}
+
+#myInfoPwSection:not([data-step="idle"]) #myInfoPwStart {
+  display: none;
+}
+
+#myInfoPwSection:not([data-step="idle"]) .myinfo-steps {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+#myInfoPwSection[data-step="current"] [data-pw-step="current"],
+#myInfoPwSection[data-step="new"] [data-pw-step="new"] {
+  display: block;
+}
+
+#myInfoPwSection[data-step="done"] [data-pw-step="done"] {
+  display: flex;
+}
+
+/* 진행 표시: 지난 단계·현재 단계는 강조색, 남은 단계는 옅게 */
+.myinfo-steps span {
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: #f1f3f7;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text-faint);
+  white-space: nowrap;
+}
+
+#myInfoPwSection[data-step="current"] [data-step-dot="current"],
+#myInfoPwSection[data-step="new"] [data-step-dot="current"],
+#myInfoPwSection[data-step="new"] [data-step-dot="new"],
+#myInfoPwSection[data-step="done"] .myinfo-steps span {
+  background: #eef3ff;
+  color: var(--color-primary);
+}
+
+.myinfo-pw-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.myinfo-pw-actions .btn {
+  height: 32px;
+  padding: 0 16px;
+  font-size: 12.5px;
+}
+
+.myinfo-pw-done {
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #ecfbf5;
+}
+
+.myinfo-pw-done b {
+  font-size: 13.5px;
+  color: #0f7a55;
+}
+
+.myinfo-pw-done p {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.myinfo-pw-done .btn {
+  margin-left: auto;
+  height: 32px;
+  padding: 0 16px;
+  font-size: 12.5px;
+}
+
+/* 완료 체크 아이콘 */
+.myinfo-done-icon {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #12b886;
+}
+
+.myinfo-done-icon::after {
+  content: "";
+  width: 10px;
+  height: 5px;
+  border-bottom: 2.2px solid #fff;
+  border-left: 2.2px solid #fff;
+  transform: rotate(-45deg) translate(1px, -1px);
+}
+
+.myinfo-msg {
+  margin: 10px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #0f9467;
+}
+
+.myinfo-msg.error {
+  color: #e0364d;
+}
+
+.myinfo-msg[hidden] {
+  display: none;
+}
+
+.myinfo-hint {
+  margin: 4px 0 0;
+  font-size: 11.5px;
+  color: var(--color-text-muted);
+}
+
+.content {
+  flex: 1;
+  padding: 24px;
+}
+
+/* 목록·문서형 페이지는 화면이 아무리 넓어도 내용이 끝까지 늘어나지 않게 폭을 제한하고
+   가운데 정렬한다. 실시간 현황처럼 화면을 꽉 채워야 하는 페이지에는 붙이지 않는다. */
+.content-narrow {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+/* ---------- Page header ---------- */
+
+.page-header {
+  margin-bottom: 18px;
+}
+
+.page-header h1 {
+  font-size: 22px;
+  letter-spacing: -0.02em;
+  margin: 0 0 4px;
+}
+
+.page-header p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+/* 제목 위 작은 영문 라벨(예: DATA EXPLORER) — 선택 사용 */
+.page-eyebrow {
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+}
+
+/* 제목 옆 오른쪽 끝에 배지·버튼을 둘 때 */
+.page-header-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.page-header-badge {
+  flex-shrink: 0;
+  padding: 5px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+/* ---------- Buttons (공통) ---------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: var(--radius-sm);
+  padding: 8px 16px;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.btn-primary {
+  background: var(--accent-grad);
+  color: #fff;
+  box-shadow: var(--accent-shadow);
+  transition: filter 0.12s ease, box-shadow 0.12s ease;
+}
+
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.06);
+  box-shadow: 0 10px 22px -8px rgba(60, 80, 240, 0.8);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.btn-danger {
+  background: #d92d20;
+  color: #fff;
+}
+
+.btn-danger:hover {
+  background: #a91e10;
+}
+
+.btn-secondary {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  color: var(--color-text);
+}
+
+.btn-secondary:hover {
+  background: var(--color-bg);
+}
+
+/* ---------- 공통 BUSY 상태 UI ----------
+   버튼 하나가 아니라 화면 전체를 덮는 오버레이 + 스핀 컨트롤로 처리 중임을 보여준다.
+   모달 위(z-index 100)에서 눌러도 가려야 하므로 그보다 높은 z-index를 쓴다.
+   배경을 옅게 블러 처리하고 중앙에 반투명 유리 카드를 띄우는 절제된
+   글래스모피즘(2026년 트렌드 — 과하지 않게, 블러 반경 6~10px 정도로 restrained하게
+   쓰는 스타일)을 적용했다. common/js/ui.js의 withGlobalBusy()가 이 DOM을 필요할 때
+   만들어 붙이고 보여준다. */
+.global-busy-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(244, 246, 249, 0.4);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  animation: global-busy-fade-in 0.15s ease-out;
+}
+
+.global-busy-overlay[hidden] {
+  display: none;
+}
+
+.global-busy-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 30px 40px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 16px 40px rgba(16, 24, 40, 0.18);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  animation: global-busy-pop 0.18s ease-out;
+}
+
+/* 단색 링 대신 꼬리가 옅어지는 그라데이션 링(conic-gradient + mask로 도넛 모양만
+   남김) — 요즘 로딩 스피너에서 흔히 쓰는, 살짝 더 고급스러운 느낌을 주는 방식이다. */
+.global-busy-spinner {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, transparent 0deg, var(--color-primary) 300deg, transparent 358deg);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 4px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 4px));
+  animation: global-busy-spin 1s linear infinite;
+}
+
+.global-busy-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  letter-spacing: 0.02em;
+}
+
+@keyframes global-busy-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes global-busy-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes global-busy-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin-bottom: 12px;
+}
+
+.back-link:hover {
+  color: var(--color-text);
+}
+
+/* ---------- Panel / card (공통) ---------- */
+
+.panel {
+  background: var(--color-surface);
+  border: 1px solid rgba(228, 232, 240, 0.9);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+.panel + .panel {
+  margin-top: 18px;
+}
+
+/* 카드 제목 앞 그라데이션 점 — <h2 class="section-title"> */
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 15.5px;
+  letter-spacing: -0.01em;
+}
+
+.section-title::before {
+  content: "";
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-grad);
+  box-shadow: 0 0 0 4px rgba(79, 110, 255, 0.14);
+}
+
+.section-title .section-sub {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--color-text-muted);
+}
+
+/* 헤더 줄 아래 선 없이 제목 + 우측 컨트롤만 두는 카드 머리 */
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 16px 18px 0;
+}
+
+/* ---------- 세그먼트 버튼 (탭) ---------- */
+
+.segmented {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 11px;
+  background: #eef1f6;
+}
+
+.segmented:empty {
+  display: none;
+}
+
+.segmented-btn {
+  padding: 5px 16px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.segmented-btn:hover {
+  color: var(--color-primary);
+}
+
+.segmented-btn.active {
+  background: #fff;
+  color: var(--color-primary);
+  box-shadow: var(--shadow-pop);
+}
+
+/* ---------- 필터 칩 (건수는 <em>으로 옅게) ---------- */
+
+.chip-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  padding: 5px 13px;
+  border: none;
+  border-radius: 99px;
+  background: #f1f3f8;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.chip em {
+  margin-left: 5px;
+  font-style: normal;
+  color: var(--color-text-faint);
+}
+
+.chip:hover {
+  background: #e7ebf3;
+  color: var(--color-primary);
+}
+
+.chip.active {
+  background: var(--accent-grad);
+  color: #fff;
+  box-shadow: 0 6px 14px -8px rgba(60, 80, 240, 0.8);
+}
+
+.chip.active em {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+/* ---------- Data table (공통) ---------- */
+
+/* 헤어라인 미니멀(2026-09-17 A안): 머리글은 회색 띠 없이 작고 옅은 라벨 + 아래 얇은 선,
+   행은 넉넉한 높이에 아주 옅은 구분선만 둔다. 마우스 오버는 아래 .table-hover 참고. */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.data-table th,
+.data-table td {
+  padding: 13px 14px;
+  text-align: left;
+  vertical-align: middle;
+  border-bottom: 1px solid #f1f3f8;
+}
+
+.data-table th {
+  padding-top: 12px;
+  padding-bottom: 12px;
+  color: var(--color-text-faint);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  background: transparent;
+  border-bottom-color: var(--color-border);
+}
+
+.data-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.data-table tbody tr.clickable {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.data-table tbody tr.clickable:hover {
+  background: linear-gradient(90deg, rgba(47, 91, 234, 0.06), rgba(47, 91, 234, 0.015) 60%, transparent);
+}
+
+.data-table tbody tr.selected {
+  background: linear-gradient(90deg, rgba(47, 91, 234, 0.1), rgba(47, 91, 234, 0.03) 60%, rgba(47, 91, 234, 0.015));
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+/* ---------- Badge (상태 표시) ---------- */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.badge::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.badge-normal { background: #eafaf3; color: #0f9467; }
+.badge-alarm { background: #fff0f1; color: #e0364d; }
+.badge-warning { background: #fff6ed; color: #b54708; }
+.badge-muted { background: #f1f3f7; color: #6a7489; }
+.badge-stop { background: #ffe9e6; color: #c4261d; }
+.badge-info { background: #eef3ff; color: #2f5bea; }
+.badge-violet { background: #f3f1fb; color: #6b5fa8; }
+
+/* ---------- 요약 타일 (아이콘 배지 + 큰 값 + 게이지) ----------
+   <div class="stat-tile stat-tile-blue">
+     <div class="stat-tile-top"><span class="stat-tile-icon"><svg/></span><span class="stat-tile-label">가동율</span></div>
+     <div class="stat-tile-value">86.4<small>%</small></div>
+     <div class="stat-meter"><i style="width: 86%"></i></div>
+     <div class="stat-tile-sub">운전 20시간</div>
+   </div>
+   색: stat-tile-blue / teal / red / violet */
+
+.stat-tile {
+  position: relative;
+  overflow: hidden;
+  padding: 16px 18px;
+  background: var(--color-surface);
+  border: 1px solid rgba(228, 232, 240, 0.9);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+/* 오른쪽 위의 옅은 원 장식 */
+.stat-tile::after {
+  content: "";
+  position: absolute;
+  right: -40px;
+  top: -40px;
+  width: 130px;
+  height: 130px;
+  border-radius: 50%;
+  background: var(--tint);
+  opacity: 0.09;
+  pointer-events: none;
+}
+
+.stat-tile-blue { --tint: #3b6cff; --tint-grad: linear-gradient(135deg, #4f86ff, #3a57f0); }
+.stat-tile-teal { --tint: #13a88a; --tint-grad: linear-gradient(135deg, #2cc9a0, #0f9483); }
+.stat-tile-red { --tint: #ef4b5b; --tint-grad: linear-gradient(135deg, #ff7a6b, #e8385a); }
+.stat-tile-violet { --tint: #7a55f5; --tint-grad: linear-gradient(135deg, #9c7bff, #6a47eb); }
+
+.stat-tile-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.stat-tile-icon {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--tint-grad);
+  box-shadow: 0 6px 14px -6px var(--tint);
+}
+
+.stat-tile-icon svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: #fff;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.stat-tile-label {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
+.stat-tile-value {
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 숫자 뒤 단위(%, 시간, 분, 건, 대)는 작고 옅게 */
+.stat-tile-value small {
+  margin: 0 4px 0 2px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--color-text-muted);
+}
+
+.stat-tile-value small:last-child {
+  margin-right: 0;
+}
+
+.stat-tile-sub {
+  margin-top: 8px;
+  font-size: 11.5px;
+  color: var(--color-text-muted);
+}
+
+.stat-meter {
+  height: 6px;
+  margin-top: 10px;
+  border-radius: 99px;
+  background: #eef1f6;
+  overflow: hidden;
+}
+
+.stat-meter i {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: 99px;
+  background: var(--tint-grad, var(--accent-grad));
+  transition: width 0.4s ease;
+}
+
+.stat-pills {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.mini-pill {
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: #fff1f2;
+  font-size: 11px;
+  font-weight: 700;
+  color: #d9364b;
+}
+
+.mini-pill.ok {
+  background: #ecfbf5;
+  color: #0f9467;
+}
+
+/* .btn은 display를 지정하므로 hidden 속성이 무시된다 — 명시적으로 숨긴다 */
+.btn[hidden] {
+  display: none;
+}
+
+/* ---------- Form field (공통) ---------- */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.field label {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+/* ---------- 공용 에디트 박스 & select UI ----------
+   프로젝트 전체의 모든 텍스트/숫자/날짜 입력칸·textarea·select에 공통 적용되는
+   표준 스타일이다. 새 입력 요소를 추가할 때 별도 클래스 없이 이 스타일이 자동
+   적용되며, 폭처럼 화면별로 다른 부분만 각 페이지 CSS에서 덮어쓰면 된다(단
+   border/background/포커스 효과는 되도록 건드리지 않는 것을 권장한다 — 화면마다
+   입력칸 느낌이 달라지는 것을 막기 위함). */
+input[type="text"],
+input[type="number"],
+input[type="date"],
+input[type="email"],
+input[type="tel"],
+input[type="password"],
+input[type="search"],
+textarea,
+select {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 7px 10px;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.4;
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  transition: border-color 0.12s ease, box-shadow 0.12s ease, background-color 0.12s ease;
+}
+
+textarea {
+  resize: vertical;
+}
+
+/* 숫자는 자릿수가 바뀌어도 폭이 흔들리지 않도록 고정폭 숫자로 표시한다 */
+input[type="number"] {
+  font-variant-numeric: tabular-nums;
+}
+
+input[type="text"]::placeholder,
+input[type="number"]::placeholder,
+input[type="date"]::placeholder,
+input[type="email"]::placeholder,
+input[type="tel"]::placeholder,
+input[type="password"]::placeholder,
+input[type="search"]::placeholder,
+textarea::placeholder {
+  color: var(--color-text-muted);
+}
+
+input[type="text"]:hover:not(:disabled):not(:focus),
+input[type="number"]:hover:not(:disabled):not(:focus),
+input[type="date"]:hover:not(:disabled):not(:focus),
+input[type="email"]:hover:not(:disabled):not(:focus),
+input[type="tel"]:hover:not(:disabled):not(:focus),
+input[type="password"]:hover:not(:disabled):not(:focus),
+input[type="search"]:hover:not(:disabled):not(:focus),
+textarea:hover:not(:disabled):not(:focus),
+select:hover:not(:disabled) {
+  border-color: var(--color-border-strong);
+}
+
+input[type="text"]:focus,
+input[type="number"]:focus,
+input[type="date"]:focus,
+input[type="email"]:focus,
+input[type="tel"]:focus,
+input[type="password"]:focus,
+input[type="search"]:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: var(--field-focus-ring);
+}
+
+input:disabled,
+textarea:disabled,
+select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  background-color: var(--field-bg-disabled);
+  color: var(--color-text-muted);
+}
+
+input[readonly]:not([type="checkbox"]):not([type="radio"]) {
+  background-color: var(--field-bg-disabled);
+  color: var(--color-text-muted);
+  cursor: default;
+}
+
+/* select는 브라우저 기본 화살표(OS/브라우저마다 모양이 다름)를 appearance:none으로
+   완전히 없앤다 — 드롭다운 표시 아이콘 없이 완전히 플랫한 입력칸처럼 보이게 한다. */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  cursor: pointer;
+}
+
+select::-ms-expand {
+  display: none;
+}
+
+/* ---------- Empty / loading state ---------- */
+
+.empty-state {
+  text-align: center;
+  padding: 32px 16px;
+  color: var(--color-text-muted);
+  font-size: 13.5px;
+}
+
+/* ---------- Modal ---------- */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(16, 24, 40, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modal-overlay[hidden] {
+  display: none;
+}
+
+.modal-box {
+  width: 420px;
+  max-width: calc(100vw - 32px);
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 24px 60px -12px rgba(16, 24, 40, 0.35);
+  overflow: hidden;
+}
+
+.modal-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.modal-body {
+  padding: 18px 20px;
+  font-size: 13.5px;
+}
+
+.modal-footer {
+  padding: 14px 20px;
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* 모든 모달/팝업이 공유하는 닫기(×) 버튼 — 원형 배경 + hover 시 경고색.
+   footer의 저장/닫기/삭제는 공용 .btn / .btn-primary / .btn-secondary / .btn-danger를 쓴다. */
+.modal-close-btn {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: #f2f4f7;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.modal-close-btn:hover {
+  background: var(--status-alarm-bg, #fef3f2);
+  color: var(--status-alarm-text, #d03b3b);
+}
+
+/* ---------- 결재 바 (common/js/approval.js가 그리는 마크업) ----------
+   점검일지 / 운전일지 / 수리보수 및 철거일지 / 교육훈련 일지가 공유한다. 실물 결재란처럼
+   칸이 서로 붙은 표 모양이며, 승인 칸은 좌상단 취소 · 우상단 날짜 · 가운데 성명 배치다.
+   폭과 위치(예: 우측 절반)는 화면마다 달라서 각 페이지 CSS에서 .approval-bar를 덮어쓴다. */
+
+.approval-bar {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin-bottom: 18px;
+}
+
+.approval-slot {
+  border: 1px solid var(--color-border);
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.approval-slot + .approval-slot {
+  border-left: none;
+}
+
+.approval-slot-header {
+  background: #fafbfc;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  padding: 8px 6px;
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.approval-slot-body {
+  position: relative;
+  flex: 1;
+  min-height: 88px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 10px 12px;
+}
+
+.approval-approved {
+  position: absolute;
+  inset: 0;
+  /* 상단 취소/날짜 줄을 위한 공간을 띄우고, 성명은 그 아래 남은 영역의 정중앙에 온다 */
+  padding-top: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.approval-approved-name {
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.approval-approved-date {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  font-size: 10.5px;
+  color: var(--color-text-muted);
+}
+
+.approval-cancel-btn {
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  margin: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 11.5px;
+  text-decoration: underline;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.approval-cancel-btn:hover {
+  color: var(--status-alarm-text, #d03b3b);
+}
+
+.approval-pending-text {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+/* "해당없음" 단계는 글자 "/" 대신 칸 전체를 가로지르는 대각선으로 표시한다(실물 결재란 방식).
+   SVG를 배경으로 깔아 칸 크기가 어떻든 우측 상단 ↔ 좌측 하단 모서리를 정확히 잇게 한다
+   (linear-gradient로 그리면 칸이 정사각형이 아닐 때 모서리에 닿지 않는다).
+   "/" 글자 자체는 font-size: 0으로 감추되 DOM에는 남겨둔다. */
+.approval-na {
+  position: absolute;
+  inset: 0;
+  font-size: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' preserveAspectRatio='none' viewBox='0 0 100 100'%3E%3Cline x1='100' y1='0' x2='0' y2='100' stroke='%23d0d5dd' stroke-width='1' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+}
+
+.approval-delegated {
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  border: 2px solid var(--color-text-muted);
+  border-radius: 6px;
+  padding: 4px 10px;
+  transform: rotate(-8deg);
+}
+
+/* ---------- 목록 표 행 강조 + 클릭 가능한 셀 (장비 관리 · 교육훈련 공유) ----------
+   행 전체는 "지금 어느 행을 보고 있는지"만 알려주고(배경 + 왼쪽 강조 바, 커서는 기본값),
+   실제로 클릭 가능한 건 .row-link를 붙인 셀 내용뿐이다. 표에 .table-hover를 붙여 쓴다. */
+
+.data-table.table-hover tbody tr {
+  transition: background-color 0.12s ease;
+}
+
+/* 오버한 행: 왼쪽에서 번지는 옅은 파랑 그라데이션 + 왼쪽 강조 바 + 클릭 가능한 글자(.row-link) 강조색 */
+.data-table.table-hover tbody tr:hover {
+  background: linear-gradient(90deg, rgba(47, 91, 234, 0.06), rgba(47, 91, 234, 0.015) 60%, transparent);
+}
+
+.data-table.table-hover tbody tr:hover .row-link {
+  color: var(--color-primary);
+}
+
+/* td 단위로 왼쪽 강조 바를 넣는다 — tr에 직접 box-shadow를 주는 것보다 표에서
+   렌더링이 더 안정적이다. */
+.data-table.table-hover tbody tr:hover td:first-child {
+  box-shadow: inset 3px 0 0 var(--color-primary);
+}
+
+.row-link {
+  cursor: pointer;
+}
+
+.row-link:hover {
+  color: var(--color-primary);
+}
+
+/* ---------- 목록 페이지 나누기 (common/js/ui.js의 renderPager가 그리는 마크업) ---------- */
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  /* .panel에 패딩이 없어서 여기서 위아래 여백을 잡는다 — 안 그러면 표·패널 테두리에 붙는다 */
+  padding: 16px 0;
+}
+
+.pager[hidden] {
+  display: none;
+}
+
+.pager-info {
+  margin-right: 8px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.pager-btn {
+  min-width: 30px;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  font-size: 12.5px;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.pager-btn:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.pager-btn.active {
+  background: var(--accent-grad);
+  border-color: transparent;
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 6px 14px -8px rgba(60, 80, 240, 0.8);
+}
+
+.pager-btn:disabled {
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* ---------- O / X / 해당없음 토글 버튼 (common/js/ui.js의 oxCellClass와 짝) ----------
+   점검일지·운전일지가 공유한다. 누를 때마다 O → X → / → 미기록으로 돈다. */
+
+/* vertical-align: middle이 핵심 — 인라인 요소는 기본값(baseline)으로 줄 안에 놓이는데,
+   버튼 내용이 비면(미기록 상태) 기준선이 글자 baseline이 아니라 박스 아래쪽으로 잡혀서
+   줄 높이가 달라지고, 그 결과 표의 행 높이가 값이 바뀔 때마다 미세하게 출렁였다.
+   baseline 정렬에서 떼어내면 내용 유무와 무관하게 항상 같은 높이를 차지한다. */
+.ox-toggle-btn {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  line-height: 1;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  color: var(--color-text-muted);
+}
+
+.ox-toggle-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.ox-toggle-btn.cell-O {
+  background: var(--status-normal-bg, #ecfdf3);
+  border-color: #0ca30c;
+  color: #0ca30c;
+}
+
+.ox-toggle-btn.cell-X {
+  background: var(--status-alarm-bg, #fef3f2);
+  border-color: #d03b3b;
+  color: #d03b3b;
+}
+
+.ox-toggle-btn.cell-slash {
+  background: #f2f4f7;
+  border-color: #98a2b3;
+  color: #667085;
+}
+
+/* ---------- 첨부파일 목록 (common/js/attachments.js가 그리는 마크업) ---------- */
+
+.attachment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.attachment-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  background: #fafbfc;
+}
+
+.attachment-item.empty {
+  color: var(--color-text-muted);
+}
+
+.attachment-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachment-meta {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* 아이콘 버튼 — svg 파일 자체 색(#e3e3e3)이 흰 배경에서 안 보여서 mask로 색을 입힌다
+   (svg 파일은 수정하지 않는다). 경로는 이 CSS 파일 기준이다. */
+.attachment-action {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+}
+
+.attachment-action:hover {
+  opacity: 0.7;
+}
+
+.attachment-action.icon-download {
+  background-color: var(--color-primary);
+  -webkit-mask: url("../../assets/download.svg") center / 18px 18px no-repeat;
+  mask: url("../../assets/download.svg") center / 18px 18px no-repeat;
+}
+
+.attachment-action.icon-delete {
+  background-color: var(--status-alarm-text, #d03b3b);
+  -webkit-mask: url("../../assets/delete.svg") center / 18px 18px no-repeat;
+  mask: url("../../assets/delete.svg") center / 18px 18px no-repeat;
+}

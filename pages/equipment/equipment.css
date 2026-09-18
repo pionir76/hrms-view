@@ -1,0 +1,1127 @@
+/* 장비 관리 페이지 전용 스타일 */
+
+/* 모달/팝업이 하나라도 열려있는 동안 배경 페이지의 휠 스크롤을 막는다 (JS의
+   openModalOverlay/closeModalOverlay가 이 클래스를 토글한다). */
+body.eq-modal-open {
+  overflow: hidden;
+}
+
+/* 장비 목록 표의 행 강조(.table-hover)와 클릭 가능한 장비명(.row-link) 스타일은
+   교육훈련 목록과 공유하므로 common.css에 있다. */
+
+/* ---------- 좌우 레이아웃 ---------- */
+
+.eq-layout {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.eq-left {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 16px;
+}
+
+.eq-left-divider {
+  border-top: 1px solid var(--color-border);
+  margin: 4px 0;
+}
+
+/* ---------- 장비 목록 ---------- */
+
+/* table-layout: fixed + colgroup — 이게 없으면 브라우저가 그 페이지에 실제로 그려진
+   내용에 맞춰 컬럼 폭을 매번 다시 계산해서, 페이지를 넘길 때마다 폭이 들쭉날쭉해진다. */
+.eq-list-table {
+  table-layout: fixed;
+}
+
+/* 순번은 가운데 정렬(교육훈련 목록과 동일) */
+.eq-list-table th:first-child,
+.eq-list-table td:first-child {
+  text-align: center;
+}
+
+.eq-count-btn {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  border-radius: 999px;
+  padding: 3px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.eq-count-btn:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.eq-count-btn.eq-count-zero {
+  color: var(--color-text-muted);
+  font-weight: 400;
+}
+
+/* ---------- 채널 설정 표 (압축기 팝업 상세 모드에서 재사용) ---------- */
+
+.eq-channel-section {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border);
+}
+
+.eq-channel-section h3 {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin: 0 0 12px;
+}
+
+/* table-layout: fixed가 핵심 — 이게 없으면 브라우저가 셀 내용이 바뀔 때마다(체크
+   토글 on/off로 버튼 텍스트가 "✓" ↔ 빈 문자열로 바뀌는 것만으로도) 컬럼 폭·행 높이를
+   다시 계산해서 미세하게 흔들린다. colgroup으로 폭을 고정해뒀으니 이제 내용과 무관하게
+   레이아웃이 완전히 고정된다. */
+.eq-channel-table {
+  table-layout: fixed;
+}
+
+/* 압축기 전환 중 새 채널 설정을 불러오는 동안, 표를 비우지 않고 이전 내용을 옅게
+   보여준다 — openCompressorDetail 참고. */
+#cmChannelBody.eq-channel-loading {
+  opacity: 0.4;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.eq-channel-table th,
+.eq-channel-table td {
+  text-align: center;
+  font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  height: 44px;
+}
+
+.eq-channel-table th {
+  text-align: right;
+}
+
+/* 입력칸이 빽빽한 설정 표라 공통 목록 표의 넉넉한 여백·옅은 머리글 대신 예전 밀도를 유지한다 */
+.eq-channel-table th,
+.eq-channel-table td {
+  padding: 10px 12px;
+}
+
+.eq-channel-table th {
+  color: var(--color-text-muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.eq-channel-table td input[type="text"],
+.eq-channel-table td input[type="number"] {
+  width: 100%;
+  min-width: 64px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 5px 6px;
+  font-size: 12px;
+  text-align: right;
+  box-sizing: border-box;
+}
+
+/* border/background은 공통 select UI(common.css)를 그대로 쓰고, 좁은
+   테이블 칸에 맞는 크기/정렬만 여기서 덮어쓴다. */
+.eq-channel-table td select {
+  width: 100%;
+  min-width: 64px;
+  box-sizing: border-box;
+  padding: 5px 6px;
+  font-size: 12px;
+  text-align: right;
+}
+
+/* 경보하한/경보상한 입력칸에서도 스핀 화살표(위/아래 버튼)를 제거한다 — 소수점/
+   발생지연/해제지연은 아예 셀렉트로 바꿔서 스핀 UI 자체가 없다. */
+.eq-channel-table td input[type="number"]::-webkit-outer-spin-button,
+.eq-channel-table td input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.eq-channel-table td input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* 상한/하한/지연시간 입력칸 옆에 단위를 붙여 보여준다. 단위 칸 폭을 고정해야
+   "℃"/"MPa"/"SEC"처럼 글자수가 달라도 옆 입력칸 크기가 항상 같게 유지된다. */
+.eq-ch-value-with-unit {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.eq-ch-value-with-unit input {
+  flex: 1;
+  min-width: 0;
+}
+
+.eq-ch-unit-suffix {
+  flex-shrink: 0;
+  width: 26px;
+  text-align: right;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+/* 사용/경보사용 — 운전일지 O/X 토글 버튼과 동일한 디자인 언어 */
+.eq-ch-toggle-btn {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--color-text-muted);
+}
+
+.eq-ch-toggle-btn.eq-ch-toggle-on {
+  background: var(--status-normal-bg, #ecfdf3);
+  border-color: #0ca30c;
+  color: #0ca30c;
+}
+
+/* 채널 "사용" 꺼짐 → 행 전체 비활성화, "경보사용" 꺼짐 → 경보 관련 항목만 비활성화
+   (updateChannelRowDisabledState에서 disabled 속성만 걸고 값은 지우지 않는다). */
+.eq-ch-toggle-btn:disabled,
+.eq-channel-table td input:disabled,
+.eq-channel-table td select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #eef0f2;
+  color: var(--color-text-muted);
+}
+
+/* 체크마크 span은 항상 DOM에 존재하고 visibility로만 켜고 끈다 — textContent를
+   "✓" ↔ 빈 문자열로 바꾸면 버튼 내용 유무에 따라 인라인 베이스라인 계산이 미묘하게
+   달라져 행 높이가 흔들리는 문제가 있었다. 내용을 아예 바꾸지 않으면 발생하지 않는다. */
+.eq-ch-toggle-mark {
+  visibility: hidden;
+}
+
+.eq-ch-toggle-btn.eq-ch-toggle-on .eq-ch-toggle-mark {
+  visibility: visible;
+}
+
+.eq-channel-table td.eq-channel-name {
+  text-align: right;
+  color: var(--color-text-muted);
+}
+
+/* ---------- 공통: 에러 배너 ---------- */
+
+.eq-error {
+  background: var(--status-alarm-bg, #fef3f2);
+  color: var(--status-alarm-text, #d03b3b);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  font-size: 12.5px;
+  margin-bottom: 14px;
+}
+
+.eq-error[hidden] {
+  display: none;
+}
+
+/* ---------- 장비 상세/등록 모달 ---------- */
+
+.eq-modal-box {
+  width: 1320px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 64px);
+  display: flex;
+  flex-direction: column;
+}
+
+.eq-modal-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.eq-modal-eyebrow {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin-bottom: 2px;
+}
+
+.eq-modal-title {
+  margin: 0;
+  font-size: 17px;
+}
+
+/* 모달 닫기(×) 버튼 스타일은 common.css에 있다 */
+
+.eq-modal-body {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.eq-form-section {
+  padding-bottom: 18px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.eq-form-section:last-of-type {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+/* ---------- 장비 상세/등록 모달 — 좌(위치/상태·운전임계값·세부설정) / 우(이력카드) ---------- */
+
+.eq-detail-split {
+  display: flex;
+  align-items: stretch;
+  gap: 24px;
+}
+
+.eq-detail-left {
+  width: 300px;
+  flex-shrink: 0;
+  padding-right: 24px;
+  border-right: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+}
+
+.eq-detail-left .eq-form-grid {
+  grid-template-columns: 1fr;
+}
+
+.eq-detail-right {
+  flex: 1;
+  min-width: 0;
+}
+
+.eq-detail-settings-btn {
+  margin-top: auto;
+  align-self: stretch;
+}
+
+.eq-form-section h3 {
+  font-size: 13.5px;
+  margin: 0 0 12px;
+  color: var(--color-text);
+}
+
+.eq-form-note {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin: -4px 0 12px;
+}
+
+.eq-form-warning {
+  color: #b54708;
+  background: #fff6ed;
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  margin: 0 0 12px;
+}
+
+/* ---------- 신규 장비 등록 시 압축기 IP/MAC 입력 리스트 ---------- */
+
+#newCompressorRows {
+  counter-reset: eq-compressor-row;
+  margin-bottom: 10px;
+}
+
+.eq-new-compressor-row {
+  counter-increment: eq-compressor-row;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.eq-new-compressor-row::before {
+  content: "#" counter(eq-compressor-row);
+  width: 26px;
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.eq-new-compressor-row input {
+  flex: 1;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+.eq-new-compressor-remove-btn {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.eq-new-compressor-remove-btn:hover {
+  border-color: var(--status-alarm-text, #d03b3b);
+  color: var(--status-alarm-text, #d03b3b);
+}
+
+.eq-form-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px 14px;
+}
+
+/* 별도 박스 디자인(배경/테두리) 없이, 위쪽 위치/상태 섹션과 완전히 같은 폰트·구조를
+   쓴다 — 라벨(운전 임계값(A))과 입력칸만 있는 평범한 .field 하나. */
+.eq-threshold-section input[type="number"]::-webkit-outer-spin-button,
+.eq-threshold-section input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.eq-threshold-section input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* ---------- 장비 이력 카드 (사업소 실물 양식 재현) ---------- */
+
+.eq-history-card {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.eq-history-card td {
+  border: 1px solid var(--color-border);
+  padding: 6px 8px;
+  vertical-align: middle;
+}
+
+.eq-card-label {
+  background: #fafbfc;
+  text-align: center;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.eq-card-sublabel {
+  background: #fafbfc;
+  text-align: center;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.eq-history-card input[type="text"],
+.eq-history-card input[type="number"] {
+  width: 100%;
+  border: none;
+  padding: 4px 6px;
+  font-size: 12.5px;
+  background: transparent;
+}
+
+.eq-history-card input[type="text"]:focus,
+.eq-history-card input[type="number"]:focus {
+  outline: 1px solid var(--color-primary);
+  background: var(--color-surface);
+}
+
+.eq-history-card textarea {
+  width: 100%;
+  min-height: 42px;
+  border: none;
+  padding: 4px 6px;
+  font-size: 12.5px;
+  font-family: inherit;
+  resize: vertical;
+  background: transparent;
+}
+
+.eq-history-card textarea:focus {
+  outline: 1px solid var(--color-primary);
+  background: var(--color-surface);
+}
+
+.eq-card-photo-cell {
+  padding: 0 !important;
+}
+
+/* ---------- 장비 사진 / 설치 위치도 업로드 슬롯 ---------- */
+
+.eq-photo-slot {
+  padding: 12px;
+}
+
+.eq-photo-slot-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.eq-photo-slot-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.eq-photo-upload-btn {
+  cursor: pointer;
+}
+
+.eq-photo-body {
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  background: #fafbfc;
+  min-height: 90px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.eq-photo-body-tall {
+  min-height: 200px;
+}
+
+.eq-photo-body .empty-state {
+  padding: 12px;
+}
+
+.eq-photo-preview-img {
+  max-width: 100%;
+  max-height: 320px;
+  display: block;
+}
+
+/* ---------- 냉각수·브라인·전압 설정 팝업 ---------- */
+
+.eq-range-modal-box {
+  width: 480px;
+}
+
+.eq-range-warning {
+  font-size: 12px;
+  color: #b54708;
+  background: #fff6ed;
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  margin: 0 0 16px;
+}
+
+.eq-range-group {
+  padding: 12px 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.eq-range-group:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}
+
+.eq-range-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-bottom: 10px;
+}
+
+.eq-range-fields {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px 12px;
+}
+
+.eq-range-fields[data-disabled="true"] {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.eq-range-fields input {
+  text-align: right;
+}
+
+/* 스핀 화살표(위/아래 버튼) 제거 — 다른 숫자 입력칸(채널 설정 등)과 동일하게 처리 */
+.eq-range-fields input[type="number"]::-webkit-outer-spin-button,
+.eq-range-fields input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.eq-range-fields input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* 단위는 입력칸마다 붙이지 않고 그룹 토글("냉각수 사용함" 등) 옆에 한 번만 표시 */
+.eq-range-toggle-unit {
+  color: var(--color-text-muted);
+  font-weight: 400;
+  font-size: 12px;
+}
+
+/* ---------- 압축기/검사이력/수리보수일지 팝업 (목록 ↔ 상세 전환형) ---------- */
+
+.eq-popup-box {
+  width: 640px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 64px);
+  display: flex;
+  flex-direction: column;
+}
+
+/* 검사이력과 같은 좌우 분리 구조지만, 우측이 3열 서식 표라 더 넓다.
+   높이도 고정해 선택한 항목의 내용 길이에 따라 창이 출렁이지 않게 한다. */
+/* 신규작성일 때 "신규 작성" 배지까지 붙어도 세로 스크롤이 생기지 않는 높이 */
+.eq-repair-popup-box {
+  width: 1100px;
+  height: min(820px, calc(100vh - 64px));
+}
+
+#repairPopup .modal-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+#repairPopup .eq-detail-split {
+  flex: 1;
+  min-height: 0;
+}
+
+#repairPopup .eq-detail-left {
+  min-height: 0;
+}
+
+#repairPopup .eq-inspection-list {
+  flex: 1;
+  min-height: 0;
+  padding-right: 4px;
+}
+
+#repairPopup .eq-detail-right {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+#rlDetailForm[hidden] {
+  display: none;
+}
+
+/* 사업소 실물 양식(수리보수 및 철거일지)을 그대로 옮긴 표 — 칸 안에서 바로 입력한다.
+   입력칸 자체 테두리는 없애고 표의 격자선만 보이게 해야 서식처럼 보인다. */
+.eq-repair-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.eq-repair-table th,
+.eq-repair-table td {
+  border: 1px solid var(--color-border);
+}
+
+.eq-repair-table th {
+  background: #fafbfc;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-align: center;
+  line-height: 1.35;
+}
+
+/* height: 1px은 실제 높이가 아니라 "행 높이에 맞춰 늘어나되, 안쪽 입력칸이 height:100%로
+   셀 높이를 그대로 따라오게" 만드는 표 전용 관용구다 — 라벨이 두 줄인 행에서도 입력칸이
+   셀을 꽉 채워야 포커스 테두리가 셀과 정확히 겹친다. */
+.eq-repair-table td {
+  padding: 0;
+  vertical-align: top;
+  height: 1px;
+}
+
+.eq-repair-table input[type="text"],
+.eq-repair-table input[type="date"],
+.eq-repair-table textarea {
+  width: 100%;
+  height: 100%;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+.eq-repair-table textarea {
+  display: block;
+  resize: vertical;
+}
+
+/* 배경은 항상 흰색으로 두고, 지금 어느 칸에 입력 중인지는 파란 테두리로만 표시한다.
+   테두리는 입력칸에 그린다 — 셀(td)에 그리는 방식은 표 격자선에 덮여 깜빡였다.
+   대신 위 height 규칙으로 입력칸이 셀을 꽉 채우게 만들어 둘이 정확히 겹치게 했다. */
+.eq-repair-table input:focus,
+.eq-repair-table textarea:focus {
+  outline: none;
+  background: var(--color-surface);
+  box-shadow: inset 0 0 0 2px var(--color-primary);
+}
+
+/* 읽기 전용(수정 권한 없음)일 때도 칸 색을 바꾸지 않는다 — 입력칸 높이가 셀보다 작아서
+   회색을 칠하면 셀 위쪽만 회색이 되고 아래는 흰색으로 남아 얼룩덜룩해 보인다. */
+.eq-repair-table input:disabled,
+.eq-repair-table textarea:disabled {
+  background: transparent;
+  color: var(--color-text);
+  -webkit-text-fill-color: var(--color-text);
+  opacity: 1;
+}
+
+/* 서식 표와 등록자 줄이 붙어 보이지 않게 간격을 주고, 신규작성(등록자 없음)일 때도
+   같은 높이를 차지하게 해서 폼 크기가 모드에 따라 달라지지 않게 한다 */
+#rlDetailForm .eq-inspection-audit {
+  margin: 14px 0 0;
+  min-height: 15px;
+}
+
+/* 신규작성 중임을 확실히 보이게 — 검사이력과 같은 방식(빨간 테두리 + 연한 붉은 배경 + 배지).
+   평소에도 같은 두께의 투명 테두리/여백을 잡아둬서 모드가 바뀌어도 폼 크기가 변하지 않는다. */
+#rlDetailForm {
+  padding: 14px 16px;
+  border: 2px solid transparent;
+  border-radius: var(--radius-md);
+}
+
+#rlDetailForm.is-new {
+  border-color: var(--status-alarm-text, #d03b3b);
+  background: #fff5f5;
+}
+
+/* 신규작성 배경(연한 붉은색)은 폼 여백에만 남기고, 값이 들어가는 칸과 결재칸은 흰색으로 */
+#rlDetailForm.is-new .eq-repair-table td,
+#rlDetailForm.is-new .approval-slot-body {
+  background: var(--color-surface);
+}
+
+#rlDetailForm.is-new::before {
+  content: "신규 작성";
+  display: inline-block;
+  margin-bottom: 12px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--status-alarm-text, #d03b3b);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.eq-repair-approval-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+/* 안내/에러 문구 자리를 footer에 고정으로 잡아둔다 — 문구가 떴다 사라져도 서식 표는
+   그대로 있어야 해서 폼 안에 두지 않는다. 한 줄로 잘라 footer 높이도 변하지 않게 한다. */
+.eq-repair-footer {
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.eq-repair-footer-msg {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  overflow: hidden;
+}
+
+.eq-repair-footer-error,
+.eq-repair-footer-note {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.eq-repair-footer-error {
+  color: var(--status-alarm-text, #d03b3b);
+  font-weight: 600;
+}
+
+.eq-repair-footer-note {
+  color: var(--status-alarm-text, #d03b3b);
+  font-weight: 600;
+}
+
+.eq-repair-footer-note::before {
+  content: "※ ";
+}
+
+.eq-repair-footer-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* ---------- 검사이력 팝업 (좌: 목록 / 우: 상세, 항상 둘 다 표시) — 장비 상세 모달과
+   같은 폭·좌우분리 패턴(.eq-detail-split 등)을 그대로 재사용한다 ---------- */
+
+/* 선택한 항목의 첨부파일 개수에 따라 창 높이가 출렁이지 않도록 높이를 고정한다 —
+   내용이 넘치면 본문(.modal-body)만 스크롤된다. */
+.eq-inspection-popup-box {
+  width: 860px;
+  height: min(770px, calc(100vh - 64px));
+}
+
+/* 창 높이가 고정이라, 본문 전체가 아니라 좌측 목록과 우측 폼이 각자 스크롤되게 한다 */
+#inspectionPopup .modal-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+#inspectionPopup .eq-detail-split {
+  flex: 1;
+  min-height: 0;
+}
+
+#inspectionPopup .eq-detail-left {
+  min-height: 0;
+}
+
+#inspectionPopup .eq-inspection-list {
+  flex: 1;
+  min-height: 0;
+  padding-right: 4px;
+}
+
+#inspectionPopup .eq-detail-right {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.eq-inspection-add-btn {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.eq-inspection-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+}
+
+.eq-inspection-list-item {
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  cursor: pointer;
+  background: var(--color-surface);
+  transition: border-color 0.12s ease, background-color 0.12s ease;
+}
+
+.eq-inspection-list-item:hover {
+  border-color: var(--color-primary);
+}
+
+.eq-inspection-list-item.active {
+  border-color: var(--color-primary);
+  background: #eef2ff;
+}
+
+.eq-inspection-list-date {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.eq-inspection-list-author {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 수리일지 목록 항목: 날짜 줄 오른쪽은 결재 상태 배지가 쓰고, 작성자는 제목 위에 옅게 둔다 */
+.eq-repair-list-author {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.eq-inspection-list-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  margin: 2px 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.eq-inspection-list-notes {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.eq-inspection-list-notes span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.eq-inspection-clip {
+  flex-shrink: 0;
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+/* 테두리/여백은 평소에도 투명하게 잡아둬서, 신규작성 표시가 켜져도 폼 크기가 흔들리지 않게 한다 */
+#ihDetailForm {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 2px solid transparent;
+  border-radius: var(--radius-md);
+}
+
+#ihDetailForm.is-new {
+  border-color: var(--status-alarm-text, #d03b3b);
+  background: #fff5f5;
+}
+
+#ihDetailForm.is-new::before {
+  content: "신규 작성";
+  align-self: flex-start;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--status-alarm-text, #d03b3b);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* display를 지정한 요소는 hidden 속성이 무시되므로 명시적으로 숨긴다 */
+#ihDetailForm[hidden] {
+  display: none;
+}
+
+.eq-inspection-audit {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin: -6px 0 0;
+}
+
+/* "첨부파일" 라벨 오른쪽 끝에 붙는 용량 안내 — 신규작성일 때만 보인다 */
+.eq-attach-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.eq-attach-limit {
+  font-size: 10.5px;
+  color: var(--color-text-muted);
+}
+
+/* 첨부 목록 스타일(.attachment-*)은 common.css로 옮겼다 */
+
+/* ---------- 압축기 구성 팝업 (좌: 순번 선택 버튼 / 우: 상세 편집, 항상 둘 다 표시) ---------- */
+
+.eq-compressor-popup-box {
+  width: 1360px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 64px);
+  display: flex;
+  flex-direction: column;
+}
+
+/* 이제 하단에 저장/닫기 footer가 생겨서 본문이 그 높이만큼 줄어들어야 한다 —
+   다른 모달(.eq-modal-body)과 같은 flex+스크롤 패턴을 적용한다. */
+#compressorPopup .modal-body {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.eq-compressor-split {
+  display: flex;
+  gap: 24px;
+  align-items: stretch;
+}
+
+.eq-compressor-popup-subtitle {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  color: var(--color-text-muted);
+}
+
+.eq-compressor-list-panel {
+  width: 144px;
+  flex-shrink: 0;
+  padding-right: 20px;
+  border-right: 1px solid var(--color-border);
+}
+
+.eq-compressor-seq-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 480px;
+  overflow-y: auto;
+}
+
+.eq-compressor-seq-item {
+  padding: 11px 8px;
+  text-align: center;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  transition: border-color 0.12s ease, color 0.12s ease, background 0.12s ease;
+}
+
+.eq-compressor-seq-item:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.eq-compressor-seq-item.active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(26, 86, 219, 0.25);
+}
+
+.eq-compressor-detail-panel {
+  flex: 1;
+  min-width: 0;
+}
+
+/* IP/MAC/순번 카드 — 라벨+입력을 한 줄에 나란히, 옅은 배경으로 채널 설정과 시각적으로 분리 */
+.eq-compressor-info-card {
+  background: #fafbfc;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 16px 18px;
+  margin-bottom: 22px;
+  max-width: 420px;
+}
+
+.eq-compressor-field-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.eq-compressor-field-row + .eq-compressor-field-row {
+  margin-top: 10px;
+}
+
+.eq-compressor-field-row label {
+  width: 64px;
+  flex-shrink: 0;
+  font-size: 12.5px;
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.eq-compressor-field-row input {
+  flex: 1;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 7px 10px;
+  font-size: 13px;
+  text-align: right;
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.eq-compressor-field-row input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.eq-compressor-field-row input[readonly] {
+  background: #eef0f2;
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+/* ---------- 결재 바 — 스타일 본체는 common.css, 여기선 폭만 지정 ---------- */
+
+/* 승인 칸은 좌상단 "취소"와 우상단 날짜가 한 줄에 같이 놓여서, 좁으면 서로 겹친다 */
+#rlApprovalBar {
+  width: 70%;
+  margin-left: auto;
+}
+
+.eq-repair-approval-section {
+  margin-bottom: 16px;
+}

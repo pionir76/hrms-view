@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>장비 실시간 화면 - HRMS</title>
+  <link rel="stylesheet" href="../../common/css/common.css" />
+  <link rel="stylesheet" href="../../common/css/trend-view.css" />
+  <link rel="stylesheet" href="../../common/css/event-log.css" />
+  <link rel="stylesheet" href="equipment-detail.css" />
+</head>
+<body data-page="dashboard" class="page-equipment-detail">
+  <div class="app-shell">
+    <header class="topbar" id="topbar"></header>
+    <main class="content detail-content" id="content">
+      <div class="detail-grid">
+        <!-- 좌측: 장비 요약 / 제어 — 우측을 스크롤해도 제자리에 고정된다.
+             "실시간 현황으로" 링크도 좌측 안에 둬서, 좌측이 페이지 맨 위에서 시작하게 한다
+             (좌측 위에 다른 요소가 있으면 그만큼 올라간 뒤에야 고정된다) -->
+        <aside class="detail-left">
+          <a href="dashboard.html" class="back-link">← 실시간 현황으로</a>
+          <div class="panel detail-card">
+            <span class="page-eyebrow">Live Equipment</span>
+            <h1 id="equipmentTitle">장비 실시간 화면</h1>
+            <p class="detail-subtitle">
+              <span id="equipmentSubtitle"></span>
+              <span id="equipmentAlarmBadge"></span>
+            </p>
+          </div>
+
+          <div class="stat-tile stat-tile-blue">
+            <div class="stat-tile-top">
+              <span class="stat-tile-icon"><svg viewBox="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-7M21 19H3" /></svg></span>
+              <span class="stat-tile-label">가동율</span>
+            </div>
+            <div class="stat-tile-value" id="statUtilization">-</div>
+            <div class="stat-meter"><i id="statUtilizationMeter"></i></div>
+            <div class="stat-tile-sub" id="statUtilizationSub">-</div>
+          </div>
+
+          <div class="stat-tile stat-tile-teal" id="statRunningTile">
+            <div class="stat-tile-top">
+              <span class="stat-tile-icon"><svg viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z" /></svg></span>
+              <span class="stat-tile-label">운전상태</span>
+            </div>
+            <div class="stat-tile-value" id="statRunningState">-</div>
+            <div class="stat-tile-sub">10초마다 갱신</div>
+          </div>
+
+          <div class="panel detail-card">
+            <h2 class="section-title detail-card-title">압축기 구성</h2>
+            <div class="table-scroll">
+              <table class="data-table compressor-summary-table">
+                <thead>
+                  <tr>
+                    <th>압축기</th>
+                    <th>IP 주소</th>
+                    <th>MAC 주소</th>
+                  </tr>
+                </thead>
+                <tbody id="compressorSummaryList">
+                  <tr>
+                    <td colspan="3"><div class="empty-state">불러오는 중...</div></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="panel detail-card detail-emergency">
+            <h2 class="section-title detail-card-title">비상정지</h2>
+            <p class="detail-emergency-note">
+              대상 압축기와 현재 운전 상태를 확인한 후 실행하세요. (비상정지 API가 아직 준비되지 않아, 지금은 확인 절차까지만 동작합니다.)
+            </p>
+            <button type="button" class="btn btn-danger detail-emergency-btn" id="emergencyStopBtn">비상정지 실행</button>
+          </div>
+        </aside>
+
+        <!-- 우측: 압축기 리스트 / 트렌드 / 운전 상태 타임라인 / 이벤트 -->
+        <section class="detail-right">
+          <div class="panel">
+            <div class="card-head">
+              <h2 class="section-title">압축기 리스트</h2>
+              <span class="detail-hint">행을 누르면 아래 트렌드가 그 압축기로 바뀝니다 · 채널값 3초 / 통신 상태 10초마다 갱신</span>
+            </div>
+            <div class="table-scroll detail-compressor-scroll">
+              <table class="data-table compressor-table">
+                <thead>
+                  <!-- 압축기 | 채널 7개 | 통신 상태 — equipment-detail.js가 채운다 -->
+                  <tr id="compressorTableHeadRow"></tr>
+                </thead>
+                <tbody id="compressorTableBody">
+                  <tr>
+                    <td colspan="10"><div class="empty-state">불러오는 중...</div></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- 트렌드 — 툴바·그래프·채널 카드는 공통 컴포넌트(common/js/trend-view.js) -->
+          <div class="panel">
+            <div class="card-head">
+              <h2 class="section-title">압축기 트렌드 <span class="section-sub" id="trendCompressorLabel"></span></h2>
+              <div class="detail-date">
+                <span class="detail-live" id="trendLiveBadge" hidden>실시간 갱신 중</span>
+                <input type="date" id="trendDate" />
+              </div>
+            </div>
+            <div id="trendView"></div>
+          </div>
+
+          <!-- 운전 상태 타임라인 — 같은 컴포넌트가 채운다 -->
+          <div class="panel" id="trendTimeline"></div>
+
+          <!-- 이벤트 — 공통 컴포넌트(common/js/event-log.js) -->
+          <div class="panel detail-event-panel">
+            <div class="card-head">
+              <h2 class="section-title">이벤트 이력</h2>
+              <div id="eventFilters"></div>
+            </div>
+            <div id="eventLog"></div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <div class="modal-overlay" id="emergencyModal" hidden>
+    <div class="modal-box">
+      <div class="modal-header">비상정지 재확인</div>
+      <div class="modal-body">
+        <div class="field" style="margin-bottom: 12px">
+          <label for="emergencyCompressorSelect">대상 압축기</label>
+          <select id="emergencyCompressorSelect"></select>
+        </div>
+        <p id="emergencyConfirmText" style="margin: 0"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" id="emergencyCancelBtn">취소</button>
+        <button type="button" class="btn btn-danger" id="emergencyConfirmBtn">비상정지 전송</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../../common/js/config.js"></script>
+  <script src="../../common/js/auth.js"></script>
+  <script src="../../common/js/api.js"></script>
+  <script src="../../common/js/layout.js"></script>
+  <script src="../../common/js/channels.js"></script>
+  <script src="../../common/js/ui.js"></script>
+  <script src="../../common/js/vendor/chart.umd.min.js"></script>
+  <script src="../../common/js/trend-view.js"></script>
+  <script src="../../common/js/event-log.js"></script>
+  <script src="equipment-detail.js"></script>
+  <script>
+    requireAuth();
+    renderLayout();
+  </script>
+</body>
+</html>

@@ -1,0 +1,434 @@
+/* 압축기 하루 트렌드 뷰 (common/js/trend-view.js의 createTrendView가 그리는 마크업)
+   자료 조회 · 장비 실시간 화면 공유. 카드 외곽(.panel)과 제목 줄은 각 페이지가 두고,
+   이 파일은 그 안쪽(툴바 · 그래프 · 채널 카드)과 타임라인 카드 안쪽만 담당한다. */
+
+/* ---------- 확대 / 축소 / 이동 / 리셋 툴바 ---------- */
+
+.tv-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px 0;
+}
+
+.tv-zoom-buttons {
+  display: flex;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.tv-zoom-btn {
+  min-width: 34px;
+  height: 30px;
+  padding: 0 10px;
+  border: none;
+  border-right: 1px solid var(--color-border);
+  background: transparent;
+  font-size: 14px;
+  font-weight: 700;
+  color: #3b4458;
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.tv-zoom-btn:last-child {
+  border-right: none;
+}
+
+.tv-zoom-btn:hover:not(:disabled) {
+  background: #f1f4fb;
+  color: var(--color-primary);
+}
+
+.tv-zoom-btn:disabled {
+  color: #c9cfda;
+  cursor: not-allowed;
+}
+
+.tv-zoom-reset {
+  font-size: 12px;
+}
+
+/* 지금 보고 있는 시간 범위 */
+.tv-range {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 14px 0 10px;
+  border: 1px solid rgba(96, 110, 255, 0.25);
+  border-radius: 999px;
+  background: var(--accent-grad-soft);
+  font-size: 12.5px;
+}
+
+.tv-range svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: var(--color-primary);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.tv-range-label {
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.tv-range-value {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-primary);
+  background: var(--accent-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* ---------- 그래프 + 채널 카드 ---------- */
+
+/* 그래프가 없을 때(불러오는 중·데이터 없음)도 높이를 유지한다 — 높이가 줄었다 늘면
+   아래 카드까지 밀려서 화면 전체가 흔들린다 */
+.tv-body {
+  padding: 12px 18px 18px;
+  min-height: 482px;
+}
+
+.tv-body > .empty-state {
+  padding-top: 200px;
+}
+
+.tv-split {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 452px;
+}
+
+.tv-chart-wrap {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  border: 1px solid var(--color-border-soft);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #fbfcff 0%, #ffffff 100%);
+  overflow: hidden;
+}
+
+.tv-chart-wrap canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* 확대 상태에서만 끌어서 옮길 수 있다 — 커서로 알려준다 */
+.tv-chart-wrap.is-zoomed canvas {
+  cursor: grab;
+}
+
+body.tv-dragging,
+body.tv-dragging canvas {
+  cursor: grabbing !important;
+  user-select: none;
+}
+
+/* 채널 카드 7개 — 폭이 좁은 화면에서는 두 줄로 접힌다 */
+.tv-readout {
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+/* 색 점 + 채널명, 큰 값, 하단 미니 추이. 선택·오버는 채널 선 색으로 물들인다.
+   color-mix를 모르는 오래된 브라우저는 바로 앞 줄의 중립색을 쓴다. */
+.tv-readout-row {
+  position: relative;
+  min-width: 0;
+  padding: 9px 10px 0;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: #fff;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.tv-readout-row:hover {
+  border-color: #c7cedb;
+  border-color: color-mix(in srgb, var(--channel-color) 40%, transparent);
+  background: #f9fafc;
+  background: color-mix(in srgb, var(--channel-color) 4%, #fff);
+}
+
+.tv-readout-row.selected {
+  border-color: var(--channel-color);
+  border-color: color-mix(in srgb, var(--channel-color) 55%, transparent);
+  background: #f5f7fb;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--channel-color) 10%, #fff) 0%, #fff 75%);
+  box-shadow: 0 0 0 3px rgba(79, 110, 255, 0.12);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--channel-color) 14%, transparent), 0 10px 22px -14px var(--channel-color);
+}
+
+.tv-readout-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.tv-readout-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--channel-color);
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--channel-color) 18%, transparent);
+}
+
+.tv-readout-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-sub);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tv-readout-row.selected .tv-readout-name {
+  color: var(--color-text);
+}
+
+.tv-readout-ch {
+  flex-shrink: 0;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--color-text-faint);
+}
+
+.tv-readout-value {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  margin-top: 4px;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.tv-readout-unit {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--color-text-muted);
+}
+
+/* 보기/숨기기 — 아이콘은 mask로 찍어 색을 입힌다(svg 원본 색이 옅다) */
+.tv-readout-toggle {
+  flex-shrink: 0;
+  align-self: center;
+  position: relative;
+  width: 22px;
+  height: 22px;
+  margin-left: auto;
+  padding: 0;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.tv-readout-toggle::before {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  background-color: #8a93a6;
+  -webkit-mask: url("../../assets/visibility.svg") center / 14px 14px no-repeat;
+  mask: url("../../assets/visibility.svg") center / 14px 14px no-repeat;
+}
+
+.tv-readout-toggle:hover {
+  background: rgba(20, 32, 60, 0.06);
+}
+
+.tv-readout-toggle:hover::before {
+  background-color: var(--color-primary);
+}
+
+.tv-readout-toggle.off::before {
+  background-color: #b7bdca;
+  -webkit-mask-image: url("../../assets/visibility_off.svg");
+  mask-image: url("../../assets/visibility_off.svg");
+}
+
+/* 카드 하단 미니 추이 — 카드 좌우 끝까지 닿게 안쪽 여백만큼 밖으로 뺀다 */
+.tv-readout-spark {
+  display: block;
+  width: calc(100% + 20px);
+  height: 26px;
+  margin: 4px -10px 0;
+}
+
+/* 숨긴 채널은 흐리게 + 빗금 배경 */
+.tv-readout-row.is-hidden {
+  background: repeating-linear-gradient(135deg, #fafbfd 0 6px, #f4f6fa 6px 12px);
+}
+
+.tv-readout-row.is-hidden .tv-readout-dot,
+.tv-readout-row.is-hidden .tv-readout-name,
+.tv-readout-row.is-hidden .tv-readout-num,
+.tv-readout-row.is-hidden .tv-readout-unit,
+.tv-readout-row.is-hidden .tv-readout-spark {
+  opacity: 0.35;
+}
+
+/* ---------- 운전 상태 타임라인 (timelineRoot 안) ---------- */
+
+.tv-timeline-panel {
+  padding: 14px 18px 10px;
+}
+
+.tv-timeline-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.tv-timeline-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 700;
+}
+
+.tv-timeline-title svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: #3b4458;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+}
+
+.tv-timeline-target {
+  padding: 1px 8px;
+  border-radius: 6px;
+  background: #eef1f6;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
+.tv-timeline-target:empty {
+  display: none;
+}
+
+.tv-legend {
+  display: flex;
+  gap: 16px;
+  font-size: 11.5px;
+  color: var(--color-text-muted);
+}
+
+.tv-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tv-legend-swatch {
+  display: inline-block;
+  width: 16px;
+  height: 11px;
+  border-radius: 3px;
+}
+
+.tv-legend-swatch.comm {
+  background: #d5d9e2;
+}
+
+.tv-legend-swatch.alarm {
+  background: #ffc9d1;
+}
+
+/* 좌우로 시각 글자 절반이 들어갈 여백 */
+.tv-timeline {
+  padding: 0 18px;
+}
+
+.tv-timeline-track {
+  position: relative;
+  height: 22px;
+  border-radius: 6px;
+  background: #eef1f8;
+  overflow: hidden;
+}
+
+.tv-timeline-grid {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(20, 32, 60, 0.07);
+}
+
+.tv-timeline-seg {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  min-width: 2px;
+}
+
+.tv-timeline-seg.comm {
+  background: #cfd4de;
+}
+
+/* 경보가 통신장애와 겹치면 두 색이 섞여 보이게 곱하기로 칠한다 */
+.tv-timeline-seg.alarm {
+  background: #ffc9d1;
+  mix-blend-mode: multiply;
+}
+
+/* 그래프를 확대했을 때 지금 보고 있는 구간 */
+.tv-timeline-window {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border: 2px solid var(--color-primary);
+  border-radius: 6px;
+  background: rgba(47, 91, 234, 0.06);
+  pointer-events: none;
+}
+
+.tv-timeline-window[hidden] {
+  display: none;
+}
+
+.tv-timeline-axis {
+  position: relative;
+  height: 18px;
+  margin-top: 6px;
+}
+
+.tv-timeline-axis span {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: #7c869a;
+  white-space: nowrap;
+}

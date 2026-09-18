@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>점검일지 - HRMS</title>
+  <link rel="stylesheet" href="../../common/css/common.css" />
+  <link rel="stylesheet" href="inspection.css" />
+</head>
+<body data-page="inspection">
+  <div class="app-shell">
+    <header class="topbar" id="topbar"></header>
+    <main class="content content-narrow" id="content">
+      <div class="page-header">
+        <h1>점검일지</h1>
+        <p>장비와 연/월을 선택하면 그 달의 주차별 점검 현황이 표시됩니다. 날짜 칸의 "작성"을 누르면 해당 주의 점검표를 작성/조회할 수 있습니다.</p>
+      </div>
+
+      <div class="inspection-grid">
+        <aside class="inspection-left">
+          <div class="field">
+            <label for="regionSelect">지역</label>
+            <select id="regionSelect">
+              <option value="">선택</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="buildingSelect">시설동</label>
+            <select id="buildingSelect" disabled>
+              <option value="">선택</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="equipmentSelect">설비</label>
+            <select id="equipmentSelect" disabled>
+              <option value="">선택</option>
+            </select>
+          </div>
+          <div class="inspection-left-divider"></div>
+          <div class="field">
+            <label for="yearSelect">년</label>
+            <select id="yearSelect"></select>
+          </div>
+          <div class="field">
+            <label for="monthSelect">월</label>
+            <select id="monthSelect"></select>
+          </div>
+        </aside>
+
+        <section class="inspection-right">
+          <div class="inspection-selection-summary" id="selectionSummary">
+            <span class="selection-placeholder">지역 · 시설동 · 설비를 선택하세요.</span>
+          </div>
+
+          <div class="panel">
+            <div class="inspection-month-nav">
+              <button type="button" class="btn btn-secondary" id="prevMonthBtn" disabled>◀ 이전</button>
+              <h2 id="calendarTitle">-</h2>
+              <button type="button" class="btn btn-secondary" id="nextMonthBtn" disabled>다음 ▶</button>
+            </div>
+            <div class="table-scroll" id="calendarArea">
+              <div class="empty-state">좌측에서 지역 · 시설동 · 설비를 선택하세요.</div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <!-- 안전점검표 모달 -->
+  <div class="modal-overlay" id="inspectionModal" hidden>
+    <div class="modal-box inspection-modal-box">
+      <div class="modal-header inspection-modal-header">
+        <span class="inspection-modal-eyebrow">Inspection Report</span>
+        <button type="button" class="modal-close-btn" id="modalCloseX" aria-label="닫기">×</button>
+      </div>
+      <div class="modal-body inspection-modal-body" id="modalBody">
+        <div class="empty-state">불러오는 중...</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="../../common/js/config.js"></script>
+  <script src="../../common/js/auth.js"></script>
+  <script src="../../common/js/api.js"></script>
+  <script src="../../common/js/ui.js"></script>
+  <script src="../../common/js/approval.js"></script>
+  <script src="../../common/js/layout.js"></script>
+  <script src="inspection.js"></script>
+  <script>
+    requireAuth();
+    renderLayout();
+  </script>
+</body>
+</html>

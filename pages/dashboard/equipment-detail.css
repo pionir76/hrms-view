@@ -1,0 +1,211 @@
+/* 장비 실시간 화면 전용 스타일
+   좌측(요약/제어) : 우측(데이터) 2단 레이아웃. 트렌드 그래프·타임라인·이벤트 목록이 들어가면서
+   화면 높이에 가두지 않고 페이지 전체가 스크롤된다(자료 조회 화면과 같은 방식). 좌측 요약은
+   스크롤해도 따라온다. 카드·타일·제목·표 모양은 common.css, 트렌드·이벤트는 공통 컴포넌트 CSS. */
+
+.detail-content {
+  width: 100%;
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+/* ---------- 좌측: 요약 / 제어 ---------- */
+
+/* 우측을 스크롤해도 좌측은 제자리에 고정된다. sticky의 top을 좌측이 원래 놓이는 위치
+   (상단바 높이 + .content 위쪽 여백 24px)와 똑같이 맞춰서, 스크롤을 시작하자마자 고정되고
+   조금도 따라 올라가지 않게 한다. 화면보다 길면 좌측 안에서만 스크롤된다. */
+.detail-left {
+  --detail-left-top: calc(var(--topbar-height) + 24px);
+  position: sticky;
+  top: var(--detail-left-top);
+  max-height: calc(100vh - var(--detail-left-top) - 24px);
+  overflow-y: auto;
+  /* 스크롤은 되지만 스크롤바는 보이지 않게 한다(휠·터치패드로는 그대로 내려간다) */
+  scrollbar-width: none;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.detail-left::-webkit-scrollbar {
+  display: none;
+}
+
+/* 높이 제한 안에서 카드들이 찌그러지지 않고 좌측 스크롤로 넘치게 한다 */
+.detail-left > * {
+  flex-shrink: 0;
+}
+
+.detail-left .back-link {
+  margin-bottom: 0;
+}
+
+.detail-left .panel + .panel {
+  margin-top: 0;
+}
+
+.detail-card {
+  padding: 16px 18px;
+}
+
+.detail-card h1 {
+  margin: 4px 0 4px;
+  font-size: 19px;
+  letter-spacing: -0.02em;
+}
+
+/* 지역 · 시설동 · 운영 상태 + 장비 기준 경보 배지(정상 / 경보발생) */
+.detail-subtitle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--color-text-muted);
+}
+
+/* 경보 상태 배지는 카드 오른쪽 끝에 붙인다 */
+#equipmentAlarmBadge {
+  margin-left: auto;
+}
+
+.detail-card-title {
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+
+.compressor-summary-table {
+  font-size: 12.5px;
+}
+
+.compressor-summary-table th,
+.compressor-summary-table td {
+  padding: 6px 8px;
+  white-space: nowrap;
+}
+
+/* 운전상태 타일 — 정지면 회색 톤 */
+.stat-tile.is-stopped {
+  --tint: #8a93a6;
+  --tint-grad: linear-gradient(135deg, #a3abbb, #7c869a);
+}
+
+.detail-emergency-note {
+  margin: 0 0 12px;
+  font-size: 12.5px;
+  color: var(--color-text-muted);
+}
+
+.detail-emergency-btn {
+  width: 100%;
+}
+
+/* ---------- 우측 ---------- */
+
+.detail-right {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.detail-hint {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  font-weight: 400;
+}
+
+.detail-compressor-scroll {
+  margin-top: 12px;
+}
+
+/* 머리글은 모두 좌측 정렬, 값은 통신 상태(배지)만 가운데 정렬하고 나머지는 좌측 정렬 */
+.compressor-table th,
+.compressor-table td {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+}
+
+.compressor-table td:last-child {
+  text-align: center;
+}
+
+.compressor-table th:nth-child(1),
+.compressor-table td:nth-child(1) {
+  padding-left: 18px;
+}
+
+/* 채널값 뒤 단위 — 작고 옅게 */
+.chval-unit {
+  margin-left: 3px;
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.compressor-table tbody tr.clickable td:first-child {
+  font-weight: 700;
+}
+
+/* 트렌드가 보여주는 압축기 행 — 왼쪽 강조 바 */
+.compressor-table tbody tr.selected td:first-child {
+  box-shadow: inset 3px 0 0 var(--color-primary);
+  color: var(--color-primary);
+}
+
+.detail-date {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.detail-date input[type="date"] {
+  height: 32px;
+  border-radius: 10px;
+  background-color: var(--color-field-bg);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 오늘 날짜를 보고 있으면 주기적으로 다시 불러온다는 표시 */
+.detail-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 99px;
+  background: #eafaf3;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #0f9467;
+}
+
+.detail-live::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: detail-live-pulse 1.6s ease-in-out infinite;
+}
+
+.detail-live[hidden] {
+  display: none;
+}
+
+@keyframes detail-live-pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.detail-event-panel {
+  overflow: hidden;
+}

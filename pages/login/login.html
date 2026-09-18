@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>로그인 - HRMS</title>
+  <link rel="stylesheet" href="../../common/css/common.css" />
+  <link rel="stylesheet" href="login.css" />
+</head>
+<body>
+  <div class="login-shell">
+    <div class="login-card">
+      <h1 class="login-title">HRMS</h1>
+      <p class="login-subtitle">현대 남양연구소 냉동기 중앙관제 시스템</p>
+
+      <div id="loginError" class="login-error" hidden></div>
+
+      <form id="loginForm" class="login-form" autocomplete="off">
+        <div class="field">
+          <label for="username">아이디</label>
+          <input type="text" id="username" name="username" required autofocus />
+        </div>
+        <div class="field">
+          <label for="password">비밀번호</label>
+          <input type="password" id="password" name="password" required />
+        </div>
+        <button type="submit" id="loginSubmit" class="btn btn-primary">로그인</button>
+      </form>
+
+      <p class="login-footer">문의사항은 시스템관리자에게 연락하세요.</p>
+    </div>
+  </div>
+
+  <script src="../../common/js/config.js"></script>
+  <script src="../../common/js/auth.js"></script>
+  <script src="login.js"></script>
+</body>
+</html>

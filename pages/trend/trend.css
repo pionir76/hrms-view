@@ -1,0 +1,131 @@
+/* 자료 조회 페이지 전용 스타일
+   카드·요약 타일·제목·탭·칩은 common.css, 트렌드 그래프는 common/css/trend-view.css,
+   이벤트 표는 common/css/event-log.css를 쓴다. 여기에는 조회 조건 바와 배치만 남긴다. */
+
+/* ---------- 조회 조건 (상단 가로 한 줄) ---------- */
+
+.dq-filter {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  padding: 16px 18px;
+  margin-bottom: 18px;
+}
+
+.dq-filter-field {
+  min-width: 150px;
+}
+
+.dq-filter-field label {
+  margin-bottom: 2px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--color-text-muted);
+}
+
+.dq-filter-equipment {
+  flex: 1;
+  min-width: 200px;
+}
+
+/* select는 공통 스타일(appearance:none)에 화살표 아이콘과 둥근 연회색 칸만 더한다 */
+.dq-filter select {
+  height: 38px;
+  padding: 0 34px 0 12px;
+  border-radius: 10px;
+  background-color: var(--color-field-bg);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a3abbb' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  font-size: 13.5px;
+}
+
+/* 날짜: ◀ 날짜 ▶ 를 한 칸으로 묶는다 */
+.dq-date-row {
+  display: flex;
+  align-items: center;
+  height: 38px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-field-bg);
+  overflow: hidden;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.dq-date-row:focus-within {
+  border-color: var(--color-primary);
+  box-shadow: var(--field-focus-ring);
+}
+
+.dq-date-row input[type="date"],
+.dq-date-row input[type="date"]:focus,
+.dq-date-row input[type="date"]:hover:not(:disabled):not(:focus) {
+  height: 36px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.dq-date-row input[type="date"] {
+  font-size: 13.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.dq-date-nav.btn {
+  flex-shrink: 0;
+  width: 32px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  font-size: 10px;
+  color: var(--color-text-muted);
+}
+
+.dq-date-nav.btn:hover {
+  background: #eef1f7;
+  color: var(--color-primary);
+}
+
+.dq-search-btn.btn {
+  flex-shrink: 0;
+  height: 38px;
+  padding: 0 26px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.dq-error {
+  background: #fff0f1;
+  color: #e0364d;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 13px;
+  margin-bottom: 14px;
+}
+
+.dq-error[hidden] {
+  display: none;
+}
+
+/* ---------- 배치 ---------- */
+
+.dq-summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.dq-stat-sub-spaced {
+  margin-top: 14px;
+}
+
+.dq-event-panel {
+  overflow: hidden;
+}

@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>HRMS</title>
+  <script>
+    var session = null;
+    try {
+      session = JSON.parse(localStorage.getItem("hrms_session"));
+    } catch (e) {}
+    window.location.replace(session && session.token ? "pages/dashboard/dashboard.html" : "pages/login/login.html");
+  </script>
+</head>
+<body></body>
+</html>

@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>교육훈련 - HRMS</title>
+  <link rel="stylesheet" href="../../common/css/common.css" />
+  <link rel="stylesheet" href="training.css" />
+</head>
+<body data-page="training">
+  <div class="app-shell">
+    <header class="topbar" id="topbar"></header>
+    <main class="content content-narrow" id="content">
+      <div>
+        <div class="page-header tr-page-header">
+          <div>
+            <h1>교육훈련</h1>
+            <p>안전 교육·훈련 실시 내역을 기록하고 결재를 받습니다. 목록에서 제목을 누르면 내용을 보거나 편집할 수 있습니다.</p>
+          </div>
+          <button type="button" class="btn btn-primary" id="trAddNewBtn">+ 신규작성</button>
+        </div>
+
+        <div class="panel">
+          <div class="table-scroll">
+            <table class="data-table table-hover tr-table">
+              <colgroup>
+                <col style="width: 80px" />
+                <col />
+                <col style="width: 130px" />
+                <col style="width: 130px" />
+                <col style="width: 150px" />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>순번</th>
+                  <th>제목</th>
+                  <th>작성자</th>
+                  <th>교육일</th>
+                  <th>결재상황</th>
+                </tr>
+              </thead>
+              <tbody id="trListBody">
+                <tr><td colspan="5"><div class="empty-state">불러오는 중...</div></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="pager" id="trPager" hidden></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- 교육훈련 일지 상세/신규작성 모달 -->
+  <div class="modal-overlay" id="trainingModal" hidden>
+    <div class="modal-box tr-modal-box">
+      <div class="modal-header tr-modal-header">
+        <div>
+          <span class="tr-modal-eyebrow">Training</span>
+          <h2 class="tr-modal-title">교육훈련 일지</h2>
+        </div>
+        <button type="button" class="modal-close-btn" id="trModalCloseX" aria-label="닫기">×</button>
+      </div>
+
+      <div class="modal-body">
+        <div id="trDetailForm">
+          <div class="tr-approval-section">
+            <div class="approval-bar" id="trApprovalBar"></div>
+            <div class="tr-approval-actions">
+              <button type="button" class="btn btn-secondary" id="trResetApprovalsBtn" hidden>결재 전체 리셋</button>
+            </div>
+          </div>
+
+          <table class="tr-form-table">
+            <colgroup>
+              <col style="width: 16%" />
+              <col style="width: 34%" />
+              <col style="width: 16%" />
+              <col style="width: 34%" />
+            </colgroup>
+            <tbody>
+              <tr>
+                <th>제목</th>
+                <td colspan="3"><input type="text" id="trTitle" /></td>
+              </tr>
+              <tr>
+                <th>일시</th>
+                <td><input type="date" id="trPerformedAt" /></td>
+                <th>장소</th>
+                <td><input type="text" id="trLocation" /></td>
+              </tr>
+              <tr>
+                <th>강사</th>
+                <td colspan="3"><input type="text" id="trInstructor" /></td>
+              </tr>
+              <tr>
+                <th>교육내용</th>
+                <td colspan="3"><textarea id="trContent" rows="5"></textarea></td>
+              </tr>
+              <tr>
+                <th>참석자 명단</th>
+                <td colspan="3"><textarea id="trAttendees" rows="3"></textarea></td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="field tr-attachment-field">
+            <label class="tr-attach-label">첨부파일<span class="tr-attach-limit" id="trAttachmentLimitHint" hidden>최대 크기 10MB</span></label>
+            <div class="attachment-list" id="trAttachmentList"></div>
+            <label class="btn btn-secondary tr-attachment-upload-btn" id="trAttachmentUploadLabel">
+              파일 추가
+              <input type="file" multiple id="trAttachmentInput" hidden />
+            </label>
+            <p class="tr-form-note" id="trAttachmentNewNotice" hidden>선택한 파일은 저장 시 함께 등록됩니다.</p>
+          </div>
+
+          <p class="tr-audit" id="trAuditInfo"></p>
+        </div>
+      </div>
+
+      <!-- 안내/에러 문구를 폼 안에 두면 나타날 때마다 폼이 밀려서, 버튼 좌측 고정 영역에 표시한다 -->
+      <div class="modal-footer tr-footer">
+        <div class="tr-footer-msg">
+          <span class="tr-footer-error" id="trModalError" hidden></span>
+          <span class="tr-footer-note" id="trLockNotice" hidden></span>
+        </div>
+        <div class="tr-footer-actions">
+          <button type="button" class="btn btn-danger" id="trDeleteBtn" hidden>삭제</button>
+          <button type="button" class="btn btn-secondary" id="trCancelBtn">닫기</button>
+          <button type="button" class="btn btn-primary" id="trSaveBtn">저장</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="../../common/js/config.js"></script>
+  <script src="../../common/js/auth.js"></script>
+  <script src="../../common/js/api.js"></script>
+  <script src="../../common/js/ui.js"></script>
+  <script src="../../common/js/approval.js"></script>
+  <script src="../../common/js/attachments.js"></script>
+  <script src="../../common/js/layout.js"></script>
+  <script src="training.js"></script>
+  <script>
+    requireAuth();
+    renderLayout();
+  </script>
+</body>
+</html>

@@ -1,0 +1,950 @@
+/* 조직 관리 페이지 전용 스타일
+   카드·버튼·세그먼트·모달 기본 모양은 common.css를 쓰고, 여기에는 조직도 카드와 인원 관리 모달만 둔다. */
+
+.org-error {
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fff0f1;
+  color: #e0364d;
+  font-size: 13px;
+}
+
+.org-error[hidden] {
+  display: none;
+}
+
+/* 담당업무별 색 — 카드 윗선·배지·관리 목록 태그가 같이 쓴다 */
+.role-1 { --role-color: #3b3fd8; --role-soft: #eeefff; --role-grad: linear-gradient(90deg, #5b5ff5, #7a4cf5); }
+.role-2 { --role-color: #2f5bea; --role-soft: #eef3ff; --role-grad: linear-gradient(90deg, #2f6bff, #4f86ff); }
+.role-3 { --role-color: #0f8f86; --role-soft: #e8f8f6; --role-grad: linear-gradient(90deg, #1bb39d, #2cc9a0); }
+.role-4 { --role-color: #6a7489; --role-soft: #f1f3f7; --role-grad: linear-gradient(90deg, #a3abbb, #c1c7d3); }
+
+/* 다운로드 아이콘 — svg 원본 색이 옅어 mask로 색을 입힌다 */
+.org-icon-download {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  background-color: currentColor;
+  -webkit-mask: url("../../assets/download.svg") center / 16px 16px no-repeat;
+  mask: url("../../assets/download.svg") center / 16px 16px no-repeat;
+}
+
+/* ---------- 조직도: 담당업무 단계를 위에서 아래로, 단계 사이는 세로 연결선 ---------- */
+
+.org-chart {
+  padding: 8px 0 24px;
+}
+
+.org-tier {
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+
+.org-tier + .org-tier {
+  margin-top: 44px;
+}
+
+.org-tier + .org-tier::before {
+  content: "";
+  position: absolute;
+  top: -44px;
+  left: 50%;
+  width: 2px;
+  height: 44px;
+  transform: translateX(-50%);
+  background: linear-gradient(180deg, rgba(47, 91, 234, 0.35), rgba(106, 76, 245, 0.35));
+}
+
+.org-tier + .org-tier::after {
+  content: "";
+  position: absolute;
+  top: -26px;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  transform: translateX(-50%);
+  border: 2px solid rgba(80, 100, 240, 0.55);
+  border-radius: 50%;
+  background: #fff;
+}
+
+.org-cards {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 16px;
+  max-width: 1180px;
+}
+
+.org-card {
+  position: relative;
+  width: 268px;
+  padding: 16px 16px 14px;
+  border: 1px solid rgba(228, 232, 240, 0.9);
+  border-radius: var(--radius-lg);
+  background: #fff;
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+.org-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 4px;
+  background: var(--role-grad);
+}
+
+.org-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* 담당업무 — 카드에서 가장 먼저 읽히도록 색 배지로 강조 */
+.org-role {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 11px;
+  border-radius: 99px;
+  background: var(--role-soft);
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--role-color);
+}
+
+.org-role::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--role-color);
+}
+
+.org-role-sm {
+  padding: 2px 10px;
+  font-size: 12px;
+}
+
+.org-report-btn {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  background: #fff;
+  color: var(--color-primary);
+  cursor: pointer;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+
+.org-report-btn:hover:not(:disabled) {
+  border-color: rgba(47, 91, 234, 0.4);
+  background: #f3f6ff;
+}
+
+/* 신고서가 없으면 흐리게 */
+.org-report-btn:disabled {
+  background: #f6f7fa;
+  color: #c9cfda;
+  cursor: default;
+}
+
+.org-dept {
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.org-name {
+  margin-top: 2px;
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.org-name small {
+  margin-left: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--color-text-muted);
+}
+
+.org-phones {
+  display: grid;
+  gap: 5px;
+  margin-top: 12px;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.org-phones div {
+  display: flex;
+  gap: 8px;
+}
+
+.org-phones span {
+  width: 44px;
+  flex-shrink: 0;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--color-text-faint);
+}
+
+.org-detail-btn {
+  width: 100%;
+  height: 34px;
+  margin-top: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: #f8f9fc;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-sub);
+  cursor: pointer;
+  transition: background-color 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.org-detail-btn:hover {
+  border-color: rgba(47, 91, 234, 0.4);
+  background: #f3f6ff;
+  color: var(--color-primary);
+}
+
+/* ---------- 모달 공통 머리 ---------- */
+
+.org-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.org-modal-eyebrow {
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+}
+
+.org-modal-title {
+  margin: 2px 0 0;
+  font-size: 17px;
+}
+
+/* 신고서 파일 칩(받기) */
+.org-file-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 3px 10px;
+  border: none;
+  border-radius: 8px;
+  background: #f3f6ff;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-primary);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.org-file-chip .org-icon-download {
+  width: 14px;
+  height: 14px;
+  -webkit-mask-size: 14px 14px;
+  mask-size: 14px 14px;
+}
+
+.org-file-chip.is-pending {
+  background: #fff6ed;
+  color: #b54708;
+  cursor: default;
+}
+
+/* ---------- 세부정보 팝업 ---------- */
+
+.org-detail-box {
+  width: 640px;
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.org-detail-body {
+  overflow-y: auto;
+}
+
+.org-detail-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  overflow: hidden;
+  font-size: 13px;
+}
+
+.org-detail-table th,
+.org-detail-table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--color-border-soft);
+  text-align: left;
+}
+
+.org-detail-table tr:last-child th,
+.org-detail-table tr:last-child td {
+  border-bottom: none;
+}
+
+.org-detail-table th {
+  width: 120px;
+  background: #f8f9fc;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.org-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 18px 0 8px;
+  font-size: 13.5px;
+  font-weight: 800;
+}
+
+.org-section-title em {
+  padding: 1px 8px;
+  border-radius: 99px;
+  background: #eef3ff;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.org-equip-groups {
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.org-equip-row {
+  display: flex;
+  gap: 10px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--color-border-soft);
+  font-size: 13px;
+}
+
+.org-equip-row:last-child {
+  border-bottom: none;
+}
+
+.org-equip-row b {
+  flex-shrink: 0;
+  width: 150px;
+}
+
+.org-equip-row span {
+  font-size: 12.5px;
+  color: var(--color-text-sub);
+}
+
+.org-equip-region {
+  background: #f8f9fc;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--color-text-muted);
+}
+
+.org-equip-empty {
+  padding: 16px;
+  font-size: 13px;
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+/* ---------- 인원 관리 모달: 좌 목록 / 우 폼 ---------- */
+
+.om-box {
+  width: 1200px;
+  max-width: calc(100vw - 32px);
+  height: 88vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.om-split {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 290px minmax(0, 1fr);
+}
+
+.om-left {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-right: 1px solid var(--color-border-soft);
+  background: #fbfcfe;
+}
+
+.om-new-btn {
+  width: 100%;
+  flex-shrink: 0;
+}
+
+.om-search {
+  width: 100%;
+  height: 34px;
+  border-radius: 10px;
+}
+
+.om-check-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.om-list {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 2px 2px 4px;
+  list-style: none;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.om-item {
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(20, 32, 60, 0.04);
+  cursor: pointer;
+  transition: border-color 0.12s ease, background-color 0.12s ease;
+}
+
+.om-item:hover {
+  border-color: rgba(47, 91, 234, 0.25);
+}
+
+.om-item.active {
+  border-color: rgba(47, 91, 234, 0.45);
+  background: linear-gradient(180deg, #f3f6ff, #fff);
+  box-shadow: 0 0 0 3px rgba(47, 91, 234, 0.1);
+}
+
+.om-item-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.om-item-top b {
+  font-size: 14px;
+}
+
+.om-item-sub {
+  margin-top: 3px;
+  font-size: 11.5px;
+  color: var(--color-text-muted);
+}
+
+.om-item.inactive b,
+.om-item.inactive .om-item-sub {
+  opacity: 0.5;
+}
+
+.om-tag {
+  padding: 1px 7px;
+  border-radius: 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+.om-tag-role {
+  background: var(--role-soft);
+  color: var(--role-color);
+}
+
+.om-tag-gray {
+  background: #eef1f6;
+  color: #6a7489;
+}
+
+.om-tag-red {
+  background: #ffe9e6;
+  color: #c4261d;
+}
+
+.om-list-empty {
+  padding: 20px 8px;
+  font-size: 12.5px;
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+.om-right {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 20px;
+}
+
+.om-right-empty {
+  padding-top: 120px;
+}
+
+.om-right-empty[hidden],
+.om-form[hidden] {
+  display: none;
+}
+
+.om-sec {
+  margin-bottom: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.om-sec-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.om-sec-head .om-sec-title {
+  margin: 0;
+}
+
+.om-sec-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  font-size: 13.5px;
+}
+
+.om-sec-title::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-grad);
+}
+
+.om-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px 14px;
+}
+
+.om-field {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.om-field label {
+  margin-bottom: 4px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
+.om-req {
+  margin-left: 2px;
+  font-style: normal;
+  color: #e0364d;
+}
+
+.om-req[hidden] {
+  display: none;
+}
+
+.om-field input[type="text"],
+.om-field input[type="password"],
+.om-field input[type="date"],
+.om-select {
+  width: 100%;
+  height: 34px;
+  border-radius: 9px;
+}
+
+.om-select {
+  padding-right: 30px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a3abbb' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+}
+
+.om-inline {
+  display: flex;
+  gap: 6px;
+}
+
+.om-inline input {
+  flex: 1;
+  min-width: 0;
+}
+
+.om-inline-btn {
+  flex-shrink: 0;
+  height: 34px;
+  padding: 0 12px;
+  font-size: 12.5px;
+}
+
+.om-full-btn {
+  width: 100%;
+  height: 34px;
+}
+
+.om-seg {
+  align-self: flex-start;
+}
+
+.om-hint {
+  margin: 4px 0 0;
+  font-size: 11.5px;
+  color: var(--color-text-muted);
+}
+
+.om-hint-ok {
+  color: #0f9467;
+}
+
+.om-hint-error {
+  color: #e0364d;
+}
+
+.om-hint[hidden] {
+  display: none;
+}
+
+/* 신규 작성 표시 — 장비 관리(수리일지·검사이력)·공지사항·교육훈련과 같은 방식:
+   폼 전체에 빨간 테두리 + 연한 붉은 배경 + 맨 위 "신규 작성" 배지. 수정 중에는 테두리를 투명하게 둬서
+   신규↔수정을 오가도 폼 크기가 바뀌지 않는다. */
+.om-form {
+  padding: 14px 16px 4px;
+  border: 2px solid transparent;
+  border-radius: var(--radius-md);
+}
+
+.om-form.is-new {
+  border-color: var(--status-alarm-text, #d03b3b);
+  background: #fff5f5;
+}
+
+.om-form.is-new::before {
+  content: "신규 작성";
+  display: inline-block;
+  margin-bottom: 12px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--status-alarm-text, #d03b3b);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* 입력 묶음(계정·인적사항·담당장비)은 신규 작성 배경에 물들지 않게 흰색으로 */
+.om-form.is-new .om-sec {
+  background: var(--color-surface);
+}
+
+/* 신규 작성 / 수정에 따라 보이는 칸이 다르다 */
+.om-form:not(.is-new) .om-new-only,
+.om-form.is-new .om-edit-only {
+  display: none;
+}
+
+.om-warn {
+  margin: 10px 0 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: #fff6ed;
+  font-size: 11.5px;
+  color: #b54708;
+}
+
+.om-warn[hidden] {
+  display: none;
+}
+
+/* 선해임 신고서 칸 — 입력칸과 같은 높이의 한 줄 */
+.om-report {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  background: #fff;
+  min-width: 0;
+}
+
+.om-report .org-file-chip {
+  min-width: 0;
+}
+
+.om-report-none {
+  font-size: 12.5px;
+  color: var(--color-text-faint);
+  white-space: nowrap;
+}
+
+.om-report-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.om-link-btn {
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-primary);
+  cursor: pointer;
+}
+
+.om-link-btn.danger {
+  color: #e0364d;
+}
+
+/* ----- 담당장비 선택 ----- */
+
+.om-equip-count {
+  padding: 2px 9px;
+  border-radius: 99px;
+  background: #eef3ff;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--color-primary);
+  white-space: nowrap;
+}
+
+.om-equip-search {
+  width: 220px;
+  margin-left: auto;
+}
+
+.om-equip-groups {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  align-items: start;
+}
+
+.om-equip-empty {
+  grid-column: 1 / -1;
+  padding: 18px;
+  font-size: 12.5px;
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+.om-group {
+  border: 1px solid var(--color-border-soft);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.om-group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+}
+
+.om-group-name {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.om-group-name span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.om-group-name em {
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.om-chevron {
+  width: 7px;
+  height: 7px;
+  border-right: 1.6px solid #a3abbb;
+  border-bottom: 1.6px solid #a3abbb;
+  transform: rotate(45deg) translate(-2px, -2px);
+  transition: transform 0.15s ease;
+}
+
+.om-group.expanded .om-chevron {
+  transform: rotate(-135deg) translate(-1px, -1px);
+}
+
+.om-group-items {
+  display: none;
+  padding: 0 10px 8px 33px;
+}
+
+.om-group.expanded .om-group-items {
+  display: grid;
+  gap: 4px;
+}
+
+.om-equip-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--color-text-sub);
+  cursor: pointer;
+}
+
+/* 시설동 전체 선택 체크 — 전부(on) / 일부(part) / 없음 세 상태 */
+.om-cb {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 1.5px solid #c7cedb;
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.om-cb.on {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+}
+
+.om-cb.on::after {
+  content: "";
+  width: 7px;
+  height: 4px;
+  border-bottom: 2px solid #fff;
+  border-left: 2px solid #fff;
+  transform: rotate(-45deg) translate(1px, -1px);
+}
+
+.om-cb.part {
+  border-color: var(--color-primary);
+}
+
+.om-cb.part::after {
+  content: "";
+  width: 8px;
+  height: 2px;
+  background: var(--color-primary);
+}
+
+.om-equip-item input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--color-primary);
+}
+
+/* ----- 하단 ----- */
+
+.om-footer {
+  align-items: center;
+}
+
+.om-footer-msg {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+}
+
+.om-footer-error {
+  color: #e0364d;
+}
+
+.om-footer-ok {
+  color: #0f9467;
+  font-weight: 600;
+}
+
+.om-footer-error[hidden],
+.om-footer-ok[hidden] {
+  display: none;
+}
+
+/* 비밀번호 초기화는 인원 관리 모달 위에 뜬다 */
+.org-pw-overlay {
+  z-index: 110;
+}
+
+.org-pw-box {
+  width: 380px;
+}
+
+.org-pw-target {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.org-pw-box input[type="password"] {
+  width: 100%;
+  height: 34px;
+  border-radius: 9px;
+}
+
+/* 필수값 누락·ID 중복확인 등으로 저장이 막힌 입력칸(입력칸·select) — 다시 입력·선택하면 풀린다 */
+.om-field input.om-input-error,
+.om-field input.om-input-error:focus,
+.om-field select.om-input-error,
+.om-field select.om-input-error:focus {
+  border-color: var(--status-alarm-text, #d03b3b);
+  box-shadow: 0 0 0 3px rgba(224, 54, 77, 0.15);
+}

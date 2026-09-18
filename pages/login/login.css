@@ -1,0 +1,78 @@
+/* 로그인 화면 전용 스타일 */
+
+.login-shell {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(160deg, #0f1c3f 0%, #10192e 55%, #0b1224 100%);
+}
+
+.login-card {
+  width: 360px;
+  max-width: calc(100vw - 32px);
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  box-shadow: 0 20px 48px rgba(8, 14, 30, 0.35);
+  padding: 32px 28px 26px;
+}
+
+.login-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0 0 2px;
+  text-align: center;
+}
+
+.login-subtitle {
+  font-size: 12.5px;
+  color: var(--color-text-muted);
+  text-align: center;
+  margin: 0 0 24px;
+}
+
+.login-form .field {
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.login-form label {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.login-form input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 13.5px;
+}
+
+.login-form .btn {
+  width: 100%;
+  margin-top: 6px;
+  padding: 10px 16px;
+}
+
+.login-error {
+  background: #fef3f2;
+  color: #d92d20;
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  font-size: 12.5px;
+  margin-bottom: 14px;
+}
+
+.login-error[hidden] {
+  display: none;
+}
+
+.login-footer {
+  margin-top: 20px;
+  text-align: center;
+  font-size: 11.5px;
+  color: var(--color-text-muted);
+}
