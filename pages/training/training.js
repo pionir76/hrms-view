@@ -85,8 +85,10 @@ function sortedTrainingItems() {
 
 // 이 문서유형은 level1(안전관리원)이 항상 "해당없음"이라 실제 단계는 책임자 → 총괄자 2개다
 function trainingApprovalStatus(item) {
-  if (item.level3?.status === "Approved") return { label: "완료", className: "badge-normal" };
-  if (item.level2?.status === "Approved") return { label: "총괄자 결재 대기", className: "badge-warning" };
+  // 전결·해당없음도 "그 단계는 끝난 것"이라 isApprovalLevelDone으로 판정한다 — 직접 "Approved"만
+  // 비교하면 문서유형 설정이 바뀌었을 때 목록이 영영 "대기"로 남는다(approval.js 참고).
+  if (isApprovalComplete(item)) return { label: "완료", className: "badge-normal" };
+  if (isApprovalLevelDone(item.level2)) return { label: "총괄자 결재 대기", className: "badge-warning" };
   return { label: "책임자 결재 대기", className: "badge-muted" };
 }
 
@@ -171,9 +173,9 @@ async function openTrainingDetail(itemId) {
   renderTrainingApprovalBar();
   applyTrainingPermissions(item);
   openModal();
+  trainingDirty.capture(); // 첨부 조회를 기다리는 사이의 입력이 기준값에 섞이지 않게 먼저 잡는다
 
   await loadTrainingAttachments(item.id);
-  trainingDirty.capture();
 }
 
 function startTrainingNewDraft() {

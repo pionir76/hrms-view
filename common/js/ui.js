@@ -175,6 +175,20 @@ function confirmDiscardIfDirty(tracker, message = "저장하지 않은 변경사
 
 // ---------- 문자열 / 날짜·시각 포맷 (여러 페이지 공통) ----------
 
+// ---------- 지구(지역) ----------
+//
+// 지구 이름은 백엔드 데이터에 있는 값을 그대로 쓴다 — 표기가 "A지구"에서 "A 지구"로 바뀐 적이 있어
+// 프론트에 목록을 하드코딩하면 조용히 안 맞게 된다. 화면 순서는 항상 가나다(A→B→C)순.
+
+function compareRegion(a, b) {
+  return String(a ?? "").localeCompare(String(b ?? ""), "ko");
+}
+
+// 장비 목록에서 실제로 쓰이는 지구만 뽑아 정렬해서 돌려준다
+function collectRegions(equipments) {
+  return [...new Set((equipments || []).map((e) => e.region).filter(Boolean))].sort(compareRegion);
+}
+
 function escapeHtml(text) {
   return String(text ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }

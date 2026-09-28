@@ -38,6 +38,25 @@ function isApprovalComplete(doc) {
   return APPROVAL_LEVEL_KEYS.every((key) => isApprovalLevelDone(doc?.[key]));
 }
 
+// 결재하기 전에 저장 안 된 변경을 처리한다(사용자 결정 2026-09-28).
+//
+// 작성자가 값을 찍고 저장 없이 곧바로 결재를 누르는 게 가장 흔한 동선인데, 결재 응답으로
+// 화면 상태를 덮어쓰면 그 입력이 조용히 사라진다. 게다가 결재가 시작되면 문서가 잠겨
+// 되돌릴 수도 없다. 그래서 변경이 있으면 저장할지 먼저 묻고, 저장이 성공해야 결재로 넘어간다.
+//
+//   tracker : common/js/ui.js의 createDirtyTracker (없으면 변경 없음으로 본다)
+//   saveFn  : 저장 함수. 성공하면 true를 돌려줘야 한다
+// 반환값: 결재를 진행해도 되면 true
+async function confirmBeforeApprove(tracker, saveFn) {
+  if (tracker && tracker.isDirty()) {
+    if (!window.confirm("저장하지 않은 변경이 있습니다. 저장하고 결재할까요?")) return false;
+    const saved = await saveFn();
+    if (!saved) return false;
+    return true;
+  }
+  return window.confirm("결재하시겠습니까?");
+}
+
 // 결재칸은 폭이 좁아 취소 버튼과 겹치기 쉬워서 시각 없이 날짜만 표시한다.
 function formatApprovalDate(iso) {
   if (!iso) return "";
@@ -78,7 +97,7 @@ function renderApprovalBar(el, doc, options = {}) {
         <div class="approval-approved">
           ${canCancel ? `<button type="button" class="approval-cancel-btn" data-level="${key}">취소</button>` : ""}
           <span class="approval-approved-date">${formatApprovalDate(level.approvedAt)}</span>
-          <div class="approval-approved-name">${level.approverName ?? ""}</div>
+          <div class="approval-approved-name">${escapeHtml(level.approverName ?? "")}</div>
         </div>
       `;
     } else {

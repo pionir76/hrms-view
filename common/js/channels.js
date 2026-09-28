@@ -13,6 +13,36 @@ const CHANNELS = [
   { no: "CH07", label: "운전전류", unit: "A" },
 ];
 
+// 단위별 표시 소수점 자리수 기본값 — 백엔드 ChannelDefaults와 같은 값이다
+// (reference/Equipment/README.md: 압력 2자리, 온도·전압·전류 1자리).
+// 압축기를 새로 만들 때 서버가 이 기준으로 채널 설정을 채우므로, 아직 채널 설정을
+// 조회할 수 없는 "신규 장비 등록" 화면에서 raw 변환에 쓰는 가정값이기도 하다.
+const DEFAULT_DECIMAL_PLACES_BY_UNIT = {
+  MPa: 2,
+  "℃": 1,
+  V: 1,
+  A: 1,
+};
+
+// 채널별 기본 소수점 자리수 — 채널 설정을 아직 못 받았을 때 쓴다
+function defaultDecimalPlacesForChannel(channelNo) {
+  const meta = CHANNELS.find((c) => c.no === channelNo);
+  return meta ? DEFAULT_DECIMAL_PLACES_BY_UNIT[meta.unit] ?? null : null;
+}
+
+// 채널값을 읽어오는 TLC D-Register 주소의 표준값(reference/pclink protocol.md).
+// 실제 주소는 압축기별 설정값이라 장비에 따라 다를 수 있다 — 여기 값은 입력칸을 채워주는
+// 제안값일 뿐이고, 맞지 않으면 담당자가 고쳐서 저장한다.
+const STANDARD_REGISTER_ADDRESSES = {
+  CH01: 360,
+  CH02: 361,
+  CH03: 362,
+  CH04: 364,
+  CH05: 365,
+  CH06: 366,
+  CH07: 367,
+};
+
 // 채널별 그래프 선 색 — 트렌드 그래프·채널 카드·이벤트 채널 태그가 모두 같은 색을 쓴다
 const CHANNEL_COLORS = {
   CH01: "#2a78d6", // blue

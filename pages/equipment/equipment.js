@@ -26,7 +26,6 @@
 //   GET/POST       /api/repair-logs                        (+ PUT/DELETE /{id})
 //   POST           /api/repair-logs/{id}/approve           (+ /approve/cancel, /approvals/reset)
 
-const REGIONS = ["A지구", "B지구", "C지구"];
 const EQUIPMENT_STATUSES = ["운영", "미운영", "수리중", "점검중", "철거예정", "철거", "사용중지", "기타"];
 
 const state = {
@@ -49,7 +48,6 @@ async function initEquipmentPage() {
   await withGlobalBusy(loadEquipments);
   initEquipmentFilters();
   renderEquipmentList();
-  loadCompressorCounts(); // 목록은 먼저 보여주고, 압축기 수는 도착하는 대로 채워 다시 그린다
 }
 
 // 모달/팝업이 하나라도 열려있는 동안 배경(장비 관리 메인 목록)의 마우스 휠 스크롤이
@@ -89,30 +87,16 @@ async function loadEquipments() {
     state.equipments = await apiFetch("/api/equipments");
   } catch (err) {
     document.getElementById("equipmentListBody").innerHTML =
-      `<tr><td colspan="7"><div class="empty-state">불러오지 못했습니다. (${err.message})</div></td></tr>`;
+      `<tr><td colspan="7"><div class="empty-state">불러오지 못했습니다. (${escapeHtml(err.message)})</div></td></tr>`;
   }
 }
 
-// GET /api/equipments 응답엔 압축기 개수가 없어서(EquipmentDto에 그런 필드가 없음),
-// "장비마다 GET .../compressors를 따로 부르는" N+1 대신 GET /api/compressors(4번,
-// 소속 장비명 조인 포함) 한 번으로 전체 압축기를 받아 (buildingName, name) 기준으로
-// 묶어 센다 — 이 조합이 장비 등록 시 중복 체크 키와 같아서 장비를 유일하게 식별한다.
-async function loadCompressorCounts() {
-  try {
-    const allCompressors = await apiFetch("/api/compressors");
-    const countByEquipment = new Map();
-    allCompressors.forEach((c) => {
-      const key = `${c.buildingName}|${c.equipmentName}`;
-      countByEquipment.set(key, (countByEquipment.get(key) ?? 0) + 1);
-    });
-    state.equipments.forEach((e) => {
-      e.compressorCount = countByEquipment.get(`${e.buildingName}|${e.name}`) ?? 0;
-    });
-    renderEquipmentList();
-  } catch (err) {
-    // 실패해도 무시한다 — 압축기 수 배지가 COMP#0으로 남을 뿐, 목록 자체는 이미 떠 있다.
-  }
-}
+// 압축기 수는 GET /api/equipments 응답의 compressorCount를 그대로 쓴다(전체 합 246 = 등록된 압축기 수).
+//
+// 예전엔 GET /api/compressors(4번)를 한 번 더 불러 (시설동, 장비명)으로 묶어 세었는데, 4번이
+// 2026-09-17부터 **운영 장비의 압축기만** 내려주게 바뀌면서 미운영 장비가 전부 COMP#0으로
+// 보였다(예: PDI 1동 실차환경챔버 #1은 실제 2대). 장비관리는 운영/미운영을 가리지 않고 등록
+// 정보를 보여주는 화면이라 1번 응답 값이 맞다.
 
 // ---------- 공통 유틸 ----------
 
@@ -144,7 +128,7 @@ function statusBadge(status) {
   const warningSet = ["수리중", "점검중", "철거예정"];
   const mutedSet = ["미운영", "철거", "사용중지", "기타"];
   const cls = status === "운영" ? "badge-normal" : warningSet.includes(status) ? "badge-warning" : mutedSet.includes(status) ? "badge-muted" : "badge-muted";
-  return `<span class="badge ${cls}">${status ?? "-"}</span>`;
+  return `<span class="badge ${cls}">${escapeHtml(status ?? "-")}</span>`;
 }
 
 function formatDateTimeKo(dateTimeStr) {
@@ -162,15 +146,25 @@ function findEquipment(equipmentId) {
 // 장비 목록
 // ========================================================================
 
-function initEquipmentFilters() {
+// 필터 선택지 갱신 — 저장 후에도 불리므로 리스너를 붙이지 않는다.
+// (예전엔 저장할 때마다 initEquipmentFilters를 다시 불러서 change/click 리스너가 중복
+//  등록됐고, "+ 신규 등록"이 두 번 실행돼 모달 열림 카운터가 어긋나면서 배경 스크롤이
+//  영영 안 풀리는 문제가 있었다.)
+function refreshEquipmentFilterOptions() {
   const regionSelect = document.getElementById("eqFilterRegion");
-  const availableRegions = REGIONS.filter((r) => state.equipments.some((e) => e.region === r));
-  regionSelect.innerHTML = `<option value="">전체</option>` + availableRegions.map((r) => `<option value="${r}">${r}</option>`).join("");
+  const availableRegions = collectRegions(state.equipments);
+  regionSelect.innerHTML = `<option value="">전체</option>` + availableRegions.map((r) => `<option value="${escapeHtml(r)}">${escapeHtml(r)}</option>`).join("");
 
   const statusSelect = document.getElementById("eqFilterStatus");
   statusSelect.innerHTML = `<option value="">전체</option>` + EQUIPMENT_STATUSES.map((s) => `<option value="${s}">${s}</option>`).join("");
 
   updateEquipmentBuildingFilter();
+}
+
+// 화면 진입 때 한 번만 부른다(선택지 채우기 + 리스너 등록)
+function initEquipmentFilters() {
+  refreshEquipmentFilterOptions();
+  const regionSelect = document.getElementById("eqFilterRegion");
 
   // 지역/시설동/상태 필터는 백엔드 호출 없이 이미 불러온 목록(state.equipments)을
   // 다시 그리는 것뿐이라 BUSY를 적용하지 않는다 — 대기할 이유가 없는데 억지로 최소
@@ -191,7 +185,7 @@ function updateEquipmentBuildingFilter() {
   const pool = region ? state.equipments.filter((e) => e.region === region) : state.equipments;
   const buildings = [...new Set(pool.map((e) => e.buildingName))].sort((a, b) => a.localeCompare(b, "ko"));
   const current = buildingSelect.value;
-  buildingSelect.innerHTML = `<option value="">전체</option>` + buildings.map((b) => `<option value="${b}">${b}</option>`).join("");
+  buildingSelect.innerHTML = `<option value="">전체</option>` + buildings.map((b) => `<option value="${escapeHtml(b)}">${escapeHtml(b)}</option>`).join("");
   if (buildings.includes(current)) buildingSelect.value = current;
 }
 
@@ -228,9 +222,9 @@ function renderEquipmentList() {
       return `
         <tr data-id="${e.id}">
           <td>${start + i + 1}</td>
-          <td>${formatLocation(e)}</td>
-          <td><span class="row-link" data-id="${e.id}">${e.name}</span></td>
-          <td>${e.managementNumber ?? "-"}</td>
+          <td>${escapeHtml(formatLocation(e))}</td>
+          <td><span class="row-link" data-id="${e.id}">${escapeHtml(e.name)}</span></td>
+          <td>${escapeHtml(e.managementNumber ?? "-")}</td>
           <td>${statusBadge(e.status)}</td>
           <td><button type="button" class="eq-count-btn${compressorCount === 0 ? " eq-count-zero" : ""}" data-kind="compressor" data-id="${e.id}">COMP#${compressorCount}</button></td>
           <td><button type="button" class="eq-count-btn" data-kind="inspection" data-id="${e.id}">검사이력</button></td>
@@ -340,7 +334,10 @@ function openEquipmentModal(equipmentId) {
   equipmentModalState.id = equipment ? equipment.id : null;
   equipmentModalState.isNew = !equipment;
   equipmentModalState.rangeSettings = equipment ? extractRangeSettings(equipment) : defaultRangeSettings();
-  equipmentModalState.runningCurrentThresholdDecimalPlaces = equipment?.runningCurrentThresholdDecimalPlaces ?? null;
+  // 신규 등록은 아직 압축기·채널 설정이 없어 서버가 알려줄 자리수도 없다 — 서버가 새 압축기
+  // CH07에 넣을 기본값(전류 1자리)을 그대로 가정해야 raw 변환이 어긋나지 않는다.
+  equipmentModalState.runningCurrentThresholdDecimalPlaces =
+    equipment?.runningCurrentThresholdDecimalPlaces ?? defaultDecimalPlacesForChannel("CH07");
 
   document.getElementById("equipmentModalTitle").textContent = equipment ? equipment.name : "신규 장비 등록";
   document.getElementById("rangeSettingsOpenBtn").hidden = !equipment;
@@ -433,7 +430,7 @@ function renderPhotoSlot(slot) {
     body.innerHTML = `<div class="empty-state">불러오는 중...</div>`;
     deleteBtn.hidden = true;
   } else if (photo) {
-    body.innerHTML = `<img class="eq-photo-preview-img" src="${photo.objectUrl}" alt="${cfg.label}" />`;
+    body.innerHTML = `<img class="eq-photo-preview-img" src="${photo.objectUrl}" alt="${escapeHtml(cfg.label)}" />`;
     deleteBtn.hidden = false;
   } else {
     body.innerHTML = `<div class="empty-state">등록된 사진이 없습니다.</div>`;
@@ -518,7 +515,11 @@ async function handlePhotoDelete(slot) {
 
 // GET 응답에 아직 없는 필드는 ?? ""로 방어 — 백엔드가 필드를 채워 내려주는 대로 그대로 표시된다.
 function fillEquipmentForm(e) {
-  setValue("fRegion", e?.region ?? "A지구");
+  // 지역 선택지는 등록된 장비들이 실제로 쓰는 지구로 채운다(표기가 바뀌어도 따라간다)
+  const regions = collectRegions(state.equipments);
+  if (e?.region && !regions.includes(e.region)) regions.push(e.region);
+  document.getElementById("fRegion").innerHTML = regions.map((r) => `<option value="${escapeHtml(r)}">${escapeHtml(r)}</option>`).join("");
+  setValue("fRegion", e?.region ?? regions[0] ?? "");
   setValue("fBuildingNumber", e?.buildingNumber);
   setValue("fBuildingName", e?.buildingName);
   setValue("fLocation", e?.location);
@@ -650,7 +651,7 @@ async function saveEquipment() {
         state.equipments.push(created);
         equipmentModalDirty.reset(); // 방금 저장한 내용을 "저장 안 한 변경사항"으로 다시 묻지 않도록
         closeEquipmentModal();
-        initEquipmentFilters();
+        refreshEquipmentFilterOptions();
         renderEquipmentList();
       });
     } catch (err) {
@@ -671,7 +672,7 @@ async function saveEquipment() {
       if (idx !== -1) state.equipments[idx] = updated;
       equipmentModalDirty.reset(); // 방금 저장한 내용을 "저장 안 한 변경사항"으로 다시 묻지 않도록
       closeEquipmentModal();
-      initEquipmentFilters();
+      refreshEquipmentFilterOptions();
       renderEquipmentList();
     });
   } catch (err) {
@@ -959,7 +960,7 @@ function renderCompressorSeqList() {
   list.innerHTML = sorted
     .map(
       (c) => `
-        <li class="eq-compressor-seq-item${String(c.id) === String(compressorPopupState.selectedId) ? " active" : ""}" data-id="${c.id}">COMP #${c.sequenceNo}</li>
+        <li class="eq-compressor-seq-item${String(c.id) === String(compressorPopupState.selectedId) ? " active" : ""}" data-id="${c.id}">COMP #${escapeHtml(c.sequenceNo)}</li>
       `
     )
     .join("");
@@ -1005,7 +1006,7 @@ async function openCompressorDetail(compressorId) {
     tbody.classList.remove("eq-channel-loading");
   } catch (err) {
     tbody.classList.remove("eq-channel-loading");
-    tbody.innerHTML = `<tr><td colspan="10"><div class="empty-state">불러오지 못했습니다. (${err.message})</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10"><div class="empty-state">불러오지 못했습니다. (${escapeHtml(err.message)})</div></td></tr>`;
     return;
   }
 
@@ -1033,6 +1034,10 @@ function validateChannelLimits(channelSettings) {
   for (const ch of channelSettings) {
     if (ch.lowerLimit !== null && ch.upperLimit !== null && ch.lowerLimit > ch.upperLimit) {
       return `${ch.channelNo}(${ch.channelName}): 경보하한은 경보상한보다 클 수 없습니다.`;
+    }
+    // 서버도 같은 조건을 400으로 막지만(25번), 저장 버튼 단계에서 먼저 알려준다
+    if (ch.enabled && ch.registerAddress === null) {
+      return `${ch.channelNo}(${ch.channelName}): 채널을 사용하려면 레지스터 주소를 입력해야 합니다.`;
     }
   }
   return null;
@@ -1079,6 +1084,8 @@ async function saveCurrentCompressorDetail() {
               upperLimit: ch.upperLimit,
               alarmEnabled: ch.alarmEnabled,
               alarmDelaySeconds: ch.alarmDelaySeconds,
+              // 채널을 끄고 보내면 서버가 주소를 null로 지운다(보낸 값 무시)
+              registerAddress: ch.registerAddress,
               alarmClearDelaySeconds: ch.alarmClearDelaySeconds,
               decimalPlaces: ch.decimalPlaces,
             }),
@@ -1086,6 +1093,16 @@ async function saveCurrentCompressorDetail() {
         )
       );
       invalidateChannelSettingsCache(compressorPopupState.selectedId);
+
+      // 꺼진 채널의 주소는 서버가 지운다(25번 API) — 화면에도 그대로 반영해서 서버 값과
+      // 어긋나지 않게 한다. 다시 켜면 표준 주소가 제안된다.
+      document.querySelectorAll("#cmChannelBody tr[data-channel]").forEach((row) => {
+        const enabled = row.querySelector('.eq-ch-toggle-btn[data-field="enabled"]').dataset.checked === "true";
+        if (!enabled) row.querySelector(".eq-ch-register").value = "";
+      });
+      payload.channelSettings.forEach((ch) => {
+        if (!ch.enabled) ch.registerAddress = null;
+      });
       compressorPopupState.detailSnapshot = JSON.stringify(payload);
 
       // 채널 설정(특히 CH07 소수점)이 장비 쪽 파생값(runningCurrentThresholdDecimalPlaces)에
@@ -1175,24 +1192,25 @@ function renderChannelSettingsTable(settings) {
       <tr data-channel="${meta.no}">
         <td>${channelToggleButton("enabled", !!s.enabled)}</td>
         <td>${meta.no}</td>
-        <td class="eq-channel-name">${s.channelName ?? meta.label}</td>
-        <td>${unit}</td>
+        <td class="eq-channel-name">${escapeHtml(s.channelName ?? meta.label)}</td>
+        <td>${escapeHtml(unit)}</td>
         <td><select class="eq-ch-decimal">${decimalPlacesOptionsHtml(s.decimalPlaces)}</select></td>
         <td>${channelToggleButton("alarmEnabled", !!s.alarmEnabled)}</td>
         <td>
           <div class="eq-ch-value-with-unit">
             <input type="number" step="any" class="eq-ch-lower" value="${rawToActualInputValue(s.lowerLimit, s.decimalPlaces)}" />
-            <span class="eq-ch-unit-suffix">${unit}</span>
+            <span class="eq-ch-unit-suffix">${escapeHtml(unit)}</span>
           </div>
         </td>
         <td>
           <div class="eq-ch-value-with-unit">
             <input type="number" step="any" class="eq-ch-upper" value="${rawToActualInputValue(s.upperLimit, s.decimalPlaces)}" />
-            <span class="eq-ch-unit-suffix">${unit}</span>
+            <span class="eq-ch-unit-suffix">${escapeHtml(unit)}</span>
           </div>
         </td>
         <td><select class="eq-ch-alarm-delay">${delaySecondsOptionsHtml(s.alarmDelaySeconds)}</select></td>
         <td><select class="eq-ch-alarm-clear-delay">${delaySecondsOptionsHtml(s.alarmClearDelaySeconds)}</select></td>
+        <td><input type="number" step="1" min="0" class="eq-ch-register" value="${s.registerAddress ?? ""}" /></td>
       </tr>
     `;
   }).join("");
@@ -1203,7 +1221,14 @@ function renderChannelSettingsTable(settings) {
       const next = btn.dataset.checked !== "true";
       btn.dataset.checked = String(next);
       btn.classList.toggle("eq-ch-toggle-on", next);
-      updateChannelRowDisabledState(btn.closest("tr"));
+      const row = btn.closest("tr");
+      // 채널을 끄면 서버가 주소를 지우므로(25번 API), 다시 켤 때 빈 칸이면 표준 주소를 채워준다.
+      // 장비 종류를 가리지 않고 같은 제안값을 넣는다 — 맞지 않으면 담당자가 고쳐서 저장하면 된다.
+      if (btn.dataset.field === "enabled" && next) {
+        const input = row.querySelector(".eq-ch-register");
+        if (!input.value) input.value = STANDARD_REGISTER_ADDRESSES[row.dataset.channel] ?? "";
+      }
+      updateChannelRowDisabledState(row);
     });
   });
 
@@ -1227,6 +1252,8 @@ function updateChannelRowDisabledState(row) {
 
   alarmBtn.disabled = !enabled;
   row.querySelector(".eq-ch-decimal").disabled = !enabled;
+  // 사용/주소는 한 쌍이다 — 끄면 서버가 주소를 null로 지운다(api-manual.md 25번)
+  row.querySelector(".eq-ch-register").disabled = !enabled;
 
   const alarmFieldsDisabled = !enabled || !alarmEnabled;
   row.querySelector(".eq-ch-lower").disabled = alarmFieldsDisabled;
@@ -1251,6 +1278,7 @@ function collectChannelSettingsPayload() {
       alarmDelaySeconds: intOrNull(row.querySelector(".eq-ch-alarm-delay").value),
       alarmClearDelaySeconds: intOrNull(row.querySelector(".eq-ch-alarm-clear-delay").value),
       decimalPlaces,
+      registerAddress: intOrNull(row.querySelector(".eq-ch-register").value),
     };
   });
 }
@@ -1313,6 +1341,7 @@ async function openInspectionPopup(equipmentId) {
   inspectionPopupState.equipmentId = equipmentId;
   inspectionPopupState.selectedId = null;
   inspectionPopupState.isNew = false;
+  inspectionPopupState.items = []; // 남겨두면 조회 실패 시 직전 장비 이력이 그대로 보이고 수정까지 된다
   inspectionPopupState.attachments = [];
   document.getElementById("ihPopupError").hidden = true;
 
@@ -1365,12 +1394,12 @@ function renderInspectionList() {
   list.innerHTML = items
     .map((item) => {
       const active = String(item.id) === String(inspectionPopupState.selectedId) && !inspectionPopupState.isNew;
-      const notes = item.notes ? item.notes.replace(/</g, "&lt;") : "";
+      const notes = escapeHtml(item.notes ?? "");
       const clip = item.attachmentCount > 0 ? `<span class="eq-inspection-clip">📎 ${item.attachmentCount}</span>` : "";
       return `
         <li class="eq-inspection-list-item${active ? " active" : ""}" data-id="${item.id}">
-          <div class="eq-inspection-list-date"><span>${item.date ?? "-"}</span><span class="eq-inspection-list-author">${item.createdByUserName ?? ""}</span></div>
-          <div class="eq-inspection-list-title">${item.title ?? "-"}</div>
+          <div class="eq-inspection-list-date"><span>${escapeHtml(item.date ?? "-")}</span><span class="eq-inspection-list-author">${escapeHtml(item.createdByUserName ?? "")}</span></div>
+          <div class="eq-inspection-list-title">${escapeHtml(item.title ?? "-")}</div>
           <div class="eq-inspection-list-notes"><span>${notes}</span>${clip}</div>
         </li>
       `;
@@ -1731,6 +1760,7 @@ async function openRepairPopup(equipmentId) {
   repairPopupState.selectedId = null;
   repairPopupState.isNew = false;
   repairPopupState.current = null;
+  repairPopupState.items = []; // 검사이력과 같은 이유 — 조회 실패 시 직전 장비 일지가 남으면 안 된다
 
   const equipment = findEquipment(equipmentId);
   document.getElementById("rlPopupEquipmentSubtitle").textContent = equipment ? formatLocation(equipment) + " · " + equipment.name : "";
@@ -1800,9 +1830,9 @@ function renderRepairList() {
       const status = repairApprovalStatus(item);
       return `
         <li class="eq-inspection-list-item${active ? " active" : ""}" data-id="${item.id}">
-          <div class="eq-inspection-list-date"><span>${toKstDateString(item.performedAt) || "-"}</span><span class="badge ${status.className}">${status.label}</span></div>
-          <div class="eq-repair-list-author">${item.createdByUserName ?? ""}</div>
-          <div class="eq-inspection-list-title">${item.title ?? "-"}</div>
+          <div class="eq-inspection-list-date"><span>${escapeHtml(toKstDateString(item.performedAt) || "-")}</span><span class="badge ${status.className}">${status.label}</span></div>
+          <div class="eq-repair-list-author">${escapeHtml(item.createdByUserName ?? "")}</div>
+          <div class="eq-inspection-list-title">${escapeHtml(item.title ?? "-")}</div>
         </li>
       `;
     })

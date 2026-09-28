@@ -3,10 +3,11 @@
 // 쓰는 API:
 //   GET /api/equipments/status  (70번) — 운영 장비 + 소속 압축기 상태. 5초마다
 //   GET /api/system/status      (71번) — 시스템 정보·서버 상태 카드. 30초마다
+//   GET /api/summary            (8번)  — 등록 전체·상태별 장비 수(미운영 표시). 30초마다
 //   GET /api/events?since=&take= (9번) — 하단 이벤트 티커. 5초마다 since 폴링
 //
 // 화면 구성(사용자 결정):
-//   좌 상단: 전체 장비 / 운전 중인 장비 / 통신 불량 장비(장비 기준) 카드
+//   좌 상단: 운영 장비(+미운영 수) / 운전 중인 장비 / 통신 불량 장비(모두 장비 기준) 카드
 //   좌 하단: 장비 리스트 — A·B·C지구 3단, 시설동으로 묶음. 행마다 압축기 수량 배지(회색) + 통신·경보
 //            on/off 배지 상시 표시(통신 = 주황, 경보 = 빨강으로 통일). 행을 누르면 장비 실시간 화면으로 이동
 //   우 상단: 시스템 정보 — 저장소 사용량 도넛(사용량·전체·남은 용량), CPU·메모리 막대
@@ -23,8 +24,6 @@ const TICKER_ITEMS = 10; // 티커에 흐르는 최근 이벤트 수
 
 // 하단 이벤트는 장비의 경보·통신 정보만 — 로그인·시스템 이벤트는 제외
 const DASHBOARD_EVENT_CATEGORIES = ["Alarm", "Communication", "EmergencyStop"];
-
-const DB_REGIONS = ["A지구", "B지구", "C지구"];
 
 const EQUIPMENT_FILTERS = [
   { key: "all", label: "전체", dot: null, test: () => true },
@@ -44,7 +43,7 @@ const dbState = {
   events: [], // 최신 먼저
   lastEventTimestamp: null,
   newEventCount: 0,
-  inactiveCount: null, // 상태가 미운영인 장비 수 — null이면 아직 모름
+  summary: null, // 8번 요약 API 응답(등록 전체·상태별 장비 수) — null이면 아직 모름
   eventCategory: "",
   panelOpen: false,
 };
@@ -98,8 +97,8 @@ function initDashboard() {
   setInterval(loadEquipments, EQUIPMENT_POLL_MS);
   loadSystemStatus();
   setInterval(loadSystemStatus, SYSTEM_POLL_MS);
-  loadInactiveEquipments();
-  setInterval(loadInactiveEquipments, SYSTEM_POLL_MS);
+  loadSummary();
+  setInterval(loadSummary, SYSTEM_POLL_MS);
   loadEventsInitial();
   setInterval(pollEvents, EVENT_POLL_MS);
   setInterval(renderLiveBadge, 1000);
@@ -150,7 +149,9 @@ function renderKpis() {
   const pct = total ? Math.round((running / total) * 1000) / 10 : 0;
 
   renderInactiveCount(total);
-  document.getElementById("kpiTotalSub").innerHTML = `압축기 <b>${compressorCount}대</b> · 시설동 ${buildingCount}`;
+  const sub = document.getElementById("kpiTotalSub");
+  sub.innerHTML = `압축기 <b>${compressorCount}대</b> · 시설동 ${buildingCount}`;
+  sub.title = "운영 장비에 속한 압축기·시설동 수 (미운영 장비 제외)";
   // 운전 중(강조) / 전체(약하게)
   document.getElementById("kpiRunning").innerHTML = `${running}<small class="db-kpi-of">/ ${total}대</small>`;
   document.getElementById("kpiRunningBar").style.width = `${pct}%`;
@@ -160,21 +161,41 @@ function renderKpis() {
   document.getElementById("kpiCommCard").classList.toggle("alert", commFail > 0);
 }
 
-// 미운영 장비 — 장비 관리에서 상태가 "미운영"인 장비 수(약하게 표시).
-// 70번은 운영 장비만 주므로 모든 상태가 오는 1번 API로 센다(30초마다).
-async function loadInactiveEquipments() {
+// 미운영 장비 — 상태가 "미운영"인 장비 수(약하게 표시).
+//
+// 이 화면의 숫자는 전부 "운영 장비" 기준이다 — 70번·8번 API가 운영 장비만 집계한다(백엔드 2026-09-17).
+// 그래서 카드 제목도 "전체 장비"가 아니라 "운영 장비"이고, 미운영 수를 옆에 같이 보여준다
+// (운영 149 + 미운영 9 = 등록된 전체 158).
+//
+// 등록 전체 기준 값은 8번 요약 API에서 가져온다(약 0.3KB) — 예전엔 1번 장비 목록(약 190KB)을
+// 통째로 받아 세었는데, 백엔드가 2026-09-18에 registeredEquipmentCount·equipmentCountByStatus를
+// 추가해줘서 필요 없어졌다.
+async function loadSummary() {
   try {
-    const all = await apiFetch("/api/equipments");
-    dbState.inactiveCount = (all || []).filter((e) => e.status === "미운영").length;
+    dbState.summary = await apiFetch("/api/summary");
   } catch (err) {
     return; // 다음 주기에 재시도 — 모르면 "-"로 둔다
   }
   renderInactiveCount(dbState.equipments.length);
 }
 
-function renderInactiveCount(total) {
-  const count = dbState.inactiveCount === null ? "-" : dbState.inactiveCount;
-  document.getElementById("kpiTotal").innerHTML = `${total}<small>대</small><span class="db-kpi-extra" title="장비 상태가 미운영인 장비">미운영 ${count}대</span>`;
+// 큰 숫자는 등록된 전체 장비 수, 그 옆에 운영·미운영을 약하게 붙인다(사용자 결정 2026-09-18).
+// operating은 70번으로 받은 실제 목록 길이 — 요약 API를 아직 못 받았으면 이 값만 보여준다.
+function renderInactiveCount(operating) {
+  const summary = dbState.summary;
+  // equipmentCountByStatus는 값이 0인 상태까지 8개가 항상 온다(백엔드 사양) — 0은 화면에서 거른다
+  const byStatus = (summary && summary.equipmentCountByStatus) || {};
+  const total = summary ? summary.registeredEquipmentCount : operating;
+  const inactive = summary ? byStatus["미운영"] || 0 : null;
+  const others = Object.entries(byStatus).filter(([status, count]) => count > 0 && status !== "운영" && status !== "미운영");
+  const tip = summary
+    ? `등록 ${total}대 = 운영 ${operating}대 + 미운영 ${inactive}대${others.length ? ` + ${others.map(([s, c]) => `${s} ${c}대`).join(" + ")}` : ""}`
+    : "운영 중인 장비 수 (등록 전체는 조회 중)";
+
+  const parts = [`<span class="db-kpi-extra">운영 ${operating}</span>`];
+  if (inactive !== null) parts.push(`<span class="db-kpi-extra">미운영 ${inactive}</span>`);
+  others.forEach(([status, count]) => parts.push(`<span class="db-kpi-extra">${escapeHtml(status)} ${count}</span>`));
+  document.getElementById("kpiTotal").innerHTML = `<span title="${escapeHtml(tip)}">${total}<small>대</small></span>${parts.join("")}`;
 }
 
 function renderFilters() {
@@ -203,7 +224,7 @@ function renderEquipmentList(force) {
   const scrollTops = {};
   container.querySelectorAll(".db-region-body").forEach((el) => (scrollTops[el.dataset.region] = el.scrollTop));
 
-  const regions = [...DB_REGIONS, ...new Set(dbState.equipments.map((e) => e.region).filter((r) => !DB_REGIONS.includes(r)))];
+  const regions = collectRegions(dbState.equipments);
   container.innerHTML = regions
     .map((region) => {
       const all = dbState.equipments.filter((e) => e.region === region);
@@ -248,7 +269,16 @@ function equipmentRowHtml(e) {
   const dotClass = comm ? "d-comm" : e.isRunning ? "d-run run" : "d-stop";
   // 압축기는 수량만 회색 사각에 표시(번호·상태 색 없음 — 사용자 결정 2026-09-17)
   const compressorCount = (e.compressors || []).length;
-  const stateText = [e.isRunning ? "운전" : "정지", comm ? "통신 불량" : null, e.hasAlarm ? "경보" : null].filter(Boolean).join(", ");
+  // 통신이 끊기면 백엔드가 hasAlarm을 항상 false로 내린다(백엔드 변경 2026-09-28) — "경보 없음"이
+  // 아니라 "알 수 없음"이므로, 경보 배지를 꺼진 모양 그대로 두지 않고 흐리게 구분한다.
+  const alarmUnknown = comm;
+  const stateText = [
+    e.isRunning ? "운전" : "정지",
+    comm ? "통신 불량" : null,
+    alarmUnknown ? "경보 여부 알 수 없음" : e.hasAlarm ? "경보" : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
 
   return `
     <div class="db-eq" data-equipment-id="${e.id}" role="link" tabindex="0" title="${escapeHtml(e.name)} — ${stateText}">
@@ -256,7 +286,9 @@ function equipmentRowHtml(e) {
       <span class="db-eq-name">${escapeHtml(e.name)}</span>
       <span class="db-comp" title="압축기 ${compressorCount}대">${compressorCount}</span>
       <span class="db-onoff comm${comm ? " on" : ""}">통신</span>
-      <span class="db-onoff alarm${e.hasAlarm ? " on" : ""}">경보</span>
+      <span class="db-onoff alarm${e.hasAlarm ? " on" : ""}${alarmUnknown ? " unknown" : ""}"${
+        alarmUnknown ? ' title="통신이 끊겨 경보 여부를 알 수 없습니다"' : ""
+      }>경보</span>
     </div>
   `;
 }

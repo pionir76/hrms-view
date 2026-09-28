@@ -105,11 +105,8 @@
                                 <div class="eq-form-grid">
                                     <div class="field">
                                         <label for="fRegion">지역 *</label>
-                                        <select id="fRegion">
-                                            <option value="A지구">A지구</option>
-                                            <option value="B지구">B지구</option>
-                                            <option value="C지구">C지구</option>
-                                        </select>
+                                        <!-- 선택지는 등록된 장비들이 쓰는 지구로 equipment.js가 채운다 -->
+                                        <select id="fRegion"></select>
                                     </div>
                                     <div class="field">
                                         <label for="fBuildingNumber">건물번호</label>
@@ -401,8 +398,9 @@
                                                 <col style="width: 8%" />
                                                 <col style="width: 13%" />
                                                 <col style="width: 13%" />
-                                                <col style="width: 15%" />
-                                                <col style="width: 15%" />
+                                                <col style="width: 9%" />
+                                                <col style="width: 9%" />
+                                                <col style="width: 12%" />
                                             </colgroup>
                                             <thead>
                                                 <tr>
@@ -416,6 +414,7 @@
                                                     <th>경보상한</th>
                                                     <th>발생지연</th>
                                                     <th>해제지연</th>
+                                                    <th>레지스터 주소</th>
                                                 </tr>
                                             </thead>
                                             <tbody id="cmChannelBody"></tbody>

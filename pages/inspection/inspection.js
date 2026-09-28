@@ -1,6 +1,5 @@
 // 점검일지 페이지 전용 스크립트
 
-const REGIONS = ["A지구", "B지구", "C지구"];
 const DAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 const DAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 
@@ -35,7 +34,7 @@ async function initInspectionPage() {
     state.equipments = await apiFetch("/api/equipments");
   } catch (err) {
     document.getElementById("calendarArea").innerHTML =
-      `<div class="empty-state">장비 목록을 불러오지 못했습니다. (${err.message})</div>`;
+      `<div class="empty-state">장비 목록을 불러오지 못했습니다. (${escapeHtml(err.message)})</div>`;
     return;
   }
 
@@ -80,8 +79,8 @@ function populateYearMonthSelects() {
 
 function populateRegionSelect() {
   const select = document.getElementById("regionSelect");
-  const availableRegions = REGIONS.filter((r) => state.equipments.some((e) => e.region === r));
-  select.innerHTML = `<option value="">선택</option>` + availableRegions.map((r) => `<option value="${r}">${r}</option>`).join("");
+  const availableRegions = collectRegions(state.equipments);
+  select.innerHTML = `<option value="">선택</option>` + availableRegions.map((r) => `<option value="${escapeHtml(r)}">${escapeHtml(r)}</option>`).join("");
 }
 
 function resetSelect(select, placeholder) {
@@ -108,7 +107,7 @@ function onRegionChange() {
   const buildings = [...new Set(state.equipments.filter((e) => e.region === region).map((e) => e.buildingName))].sort(
     (a, b) => a.localeCompare(b, "ko")
   );
-  buildingSelect.innerHTML = `<option value="">선택</option>` + buildings.map((b) => `<option value="${b}">${b}</option>`).join("");
+  buildingSelect.innerHTML = `<option value="">선택</option>` + buildings.map((b) => `<option value="${escapeHtml(b)}">${escapeHtml(b)}</option>`).join("");
   buildingSelect.disabled = false;
   renderCalendarPlaceholder("좌측에서 시설동 · 설비를 선택하세요.");
 }
@@ -131,7 +130,7 @@ function onBuildingChange() {
     .filter((e) => e.region === region && e.buildingName === buildingName)
     .sort((a, b) => a.name.localeCompare(b.name, "ko"));
   equipmentSelect.innerHTML =
-    `<option value="">선택</option>` + equipments.map((e) => `<option value="${e.id}">${e.name}</option>`).join("");
+    `<option value="">선택</option>` + equipments.map((e) => `<option value="${e.id}">${escapeHtml(e.name)}</option>`).join("");
   equipmentSelect.disabled = false;
   renderCalendarPlaceholder("좌측에서 설비를 선택하세요.");
 }
@@ -179,7 +178,7 @@ function renderSelectionSummary() {
   if (buildingName) parts.push(buildingName);
   if (state.equipmentId && state.equipmentName) parts.push(state.equipmentName);
 
-  el.innerHTML = parts.map((p) => `<span class="selection-part">${p}</span>`).join(`<span class="selection-sep">›</span>`);
+  el.innerHTML = parts.map((p) => `<span class="selection-part">${escapeHtml(p)}</span>`).join(`<span class="selection-sep">›</span>`);
 }
 
 function renderCalendarTitleOnly() {
@@ -270,6 +269,13 @@ function getMonthWeeks(year, month) {
 
 // ---------- 결재 상태 판정 ----------
 
+// 저장 안 하고 닫거나 결재하면 입력이 사라지므로, 열었을 때 값을 기준으로 잡아두고 비교한다.
+// 요일 토글·비고는 modalState.results에 바로 반영되고, 의견만 textarea에서 읽는다.
+const inspectionDirty = createDirtyTracker(() => ({
+  opinion: document.getElementById("opinionTextarea")?.value ?? modalState.opinion,
+  results: modalState.results,
+}));
+
 function isDocLocked(log) {
   return isApprovalStarted(log);
 }
@@ -306,7 +312,7 @@ async function loadCalendar() {
       weekStarts.map((ws) => apiFetch(`/api/inspection-logs?equipmentId=${equipmentId}&weekStart=${ws}`))
     );
   } catch (err) {
-    calendarArea.innerHTML = `<div class="empty-state">불러오지 못했습니다. (${err.message})</div>`;
+    calendarArea.innerHTML = `<div class="empty-state">불러오지 못했습니다. (${escapeHtml(err.message)})</div>`;
     return;
   }
 
@@ -383,12 +389,46 @@ async function openInspectionModal(weekStart) {
     modalState.results = log.results.map((r) => ({ ...r }));
 
     renderModalBody();
+    inspectionDirty.capture();
   } catch (err) {
-    modalBody.innerHTML = `<div class="empty-state">불러오지 못했습니다. (${err.message})</div>`;
+    inspectionDirty.reset();
+    modalBody.innerHTML = `<div class="empty-state">불러오지 못했습니다. (${escapeHtml(err.message)})</div>`;
   }
 }
 
+// 화면 표를 그대로 엑셀로 내려받는다(common/js/excel-export.js).
+// 점검자 의견과 표 아래 안내문도 함께 넣는다. 한 달치가 필요해지면 sheets에 주차별 표를
+// 여러 개 넣으면 된다 — 지금은 열려 있는 1주치 1건만 넣는다.
+async function exportInspectionLogToExcel() {
+  const period = `${formatDateKo(modalState.weekStart)} (일) ~ ${formatDateKo(weekEndDateStr(modalState.weekStart))} (토)`;
+  const opinion = document.getElementById("opinionTextarea")?.value.trim() ?? "";
+  await withGlobalBusy(
+    () =>
+      exportLogToExcel({
+        fileName: excelFileName(["점검일지", modalState.region, modalState.equipmentName, modalState.weekStart]),
+        sheets: [
+          {
+            name: modalState.weekStart,
+            title: "점검일지",
+            info: [
+              ["지역", modalState.region],
+              ["시설동", modalState.buildingName],
+              ["장비명", modalState.equipmentName],
+              ["점검기간", period],
+            ],
+            approvals: approvalsForExcel(modalState),
+            table: document.querySelector(".inspection-table"),
+            notes: [`점검자 의견: ${opinion || "-"}`, document.querySelector(".opinion-note")?.textContent.replace(/\s+/g, " ").trim() ?? ""],
+          },
+        ],
+      }),
+    { label: "엑셀 파일 만드는 중..." }
+  );
+}
+
 function closeInspectionModal() {
+  if (!confirmDiscardIfDirty(inspectionDirty)) return;
+  inspectionDirty.reset();
   document.getElementById("inspectionModal").hidden = true;
 }
 
@@ -403,8 +443,8 @@ function renderModalBody() {
   const session = getSession();
 
   const html = `
-    <p class="inspection-modal-location">${modalState.region} · ${modalState.buildingName}</p>
-    <h3 class="inspection-modal-title">${modalState.equipmentName}</h3>
+    <p class="inspection-modal-location">${escapeHtml(modalState.region)} · ${escapeHtml(modalState.buildingName)}</p>
+    <h3 class="inspection-modal-title">${escapeHtml(modalState.equipmentName)}</h3>
     <p class="inspection-modal-subtitle">${formatDateKo(modalState.weekStart)} (일) ~ ${formatDateKo(weekEndDateStr(modalState.weekStart))} (토)</p>
 
     <div class="inspection-error" id="inspectionError" hidden></div>
@@ -436,7 +476,7 @@ function renderModalBody() {
 
     <div class="opinion-block">
       <label for="opinionTextarea">점검자 의견</label>
-      <textarea id="opinionTextarea" class="opinion-textarea" placeholder="특이사항을 기록하세요." ${locked ? "disabled" : ""}>${modalState.opinion}</textarea>
+      <textarea id="opinionTextarea" class="opinion-textarea" placeholder="특이사항을 기록하세요." ${locked ? "disabled" : ""}>${escapeHtml(modalState.opinion)}</textarea>
       <p class="opinion-note">
         불필요 항목에는 [해당없음(N)] 으로 표시<br />
         점검내용에 대한 세부점검 내용은 사업자가 현소환경에 적정하게 작성·성안하여 함.<br />
@@ -446,9 +486,10 @@ function renderModalBody() {
 
     <div class="inspection-modal-footer">
       <div class="footer-left">
-        ${session && session.role === "시스템관리자" && modalState.id !== null ? `<button type="button" class="btn btn-secondary" id="resetApprovalBtn">결재 전체 리셋</button>` : ""}
+        ${session && session.role === "시스템관리자" && modalState.id !== null && isApprovalStarted(modalState) ? `<button type="button" class="btn btn-secondary" id="resetApprovalBtn">결재 전체 리셋</button>` : ""}
       </div>
       <div class="footer-right">
+        <button type="button" class="btn btn-secondary" id="exportExcelBtn">엑셀 저장</button>
         <button type="button" class="btn btn-secondary" id="modalCancelBtn">닫기</button>
         ${locked ? "" : `<button type="button" class="btn btn-primary" id="saveInspectionBtn">저장</button>`}
       </div>
@@ -460,10 +501,11 @@ function renderModalBody() {
   renderInspectionApprovalBar();
   renderInspectionTable();
 
+  document.getElementById("exportExcelBtn").addEventListener("click", exportInspectionLogToExcel);
   document.getElementById("modalCancelBtn").addEventListener("click", closeInspectionModal);
 
   const saveBtn = document.getElementById("saveInspectionBtn");
-  if (saveBtn) saveBtn.addEventListener("click", saveInspectionLog);
+  if (saveBtn) saveBtn.addEventListener("click", () => saveInspectionLog());
 
   const resetBtn = document.getElementById("resetApprovalBtn");
   if (resetBtn) resetBtn.addEventListener("click", resetApprovals);
@@ -490,10 +532,12 @@ function renderInspectionApprovalBar() {
 }
 
 async function approveLevel() {
+  if (!(await confirmBeforeApprove(inspectionDirty, () => saveInspectionLog({ askConfirm: false, closeAfter: false })))) return;
   try {
     const updated = await apiFetch(`/api/inspection-logs/${modalState.id}/approve`, { method: "POST" });
     applyLogResponse(updated);
     renderModalBody();
+    inspectionDirty.capture();
     loadCalendar();
   } catch (err) {
     showModalError(err);
@@ -501,10 +545,12 @@ async function approveLevel() {
 }
 
 async function cancelApproval() {
+  if (!window.confirm("결재를 취소하시겠습니까?")) return;
   try {
     const updated = await apiFetch(`/api/inspection-logs/${modalState.id}/approve/cancel`, { method: "POST" });
     applyLogResponse(updated);
     renderModalBody();
+    inspectionDirty.capture();
     loadCalendar();
   } catch (err) {
     showModalError(err);
@@ -512,10 +558,12 @@ async function cancelApproval() {
 }
 
 async function resetApprovals() {
+  if (!window.confirm("이 문서의 결재를 전부 리셋하시겠습니까?")) return;
   try {
     const updated = await apiFetch(`/api/inspection-logs/${modalState.id}/approvals/reset`, { method: "POST" });
     applyLogResponse(updated);
     renderModalBody();
+    inspectionDirty.capture();
     loadCalendar();
   } catch (err) {
     showModalError(err);
@@ -569,16 +617,16 @@ function renderInspectionTable() {
         i === 0
           ? `
             <td rowspan="${group.rows.length}">${group.key}</td>
-            <td class="item-content" rowspan="${group.rows.length}">${r.category}</td>
+            <td class="item-content" rowspan="${group.rows.length}">${escapeHtml(r.category)}</td>
           `
           : "";
 
       rowsHtml.push(`
         <tr>
           ${leadingCells}
-          <td class="item-content">${r.content}</td>
+          <td class="item-content">${escapeHtml(r.content)}</td>
           ${dayCells}
-          <td class="item-content"><input type="text" class="memo-input" data-idx="${idx}" value="${r.memo || ""}" ${locked ? "disabled" : ""} /></td>
+          <td class="item-content"><input type="text" class="memo-input" data-idx="${idx}" value="${escapeHtml(r.memo || "")}" ${locked ? "disabled" : ""} /></td>
         </tr>
       `);
     });
@@ -608,8 +656,10 @@ function renderInspectionTable() {
 
 // ---------- 저장 ----------
 
-async function saveInspectionLog() {
-  if (!window.confirm("저장하시겠습니까?")) return;
+// 결재 전 자동 저장에서도 부르므로, 성공하면 true를 돌려준다(confirmBeforeApprove 참고).
+// askConfirm=false면 이미 사용자에게 물어본 흐름이라 확인창을 건너뛴다.
+async function saveInspectionLog({ askConfirm = true, closeAfter = true } = {}) {
+  if (askConfirm && !window.confirm("저장하시겠습니까?")) return false;
 
   const opinion = document.getElementById("opinionTextarea").value;
   const payload = {
@@ -635,9 +685,12 @@ async function saveInspectionLog() {
       body: JSON.stringify(payload),
     });
     loadCalendar();
-    closeInspectionModal();
+    inspectionDirty.capture();
+    if (closeAfter) closeInspectionModal();
+    return true;
   } catch (err) {
     showModalError(err);
+    return false;
   }
 }
 

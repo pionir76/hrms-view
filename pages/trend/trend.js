@@ -10,7 +10,6 @@
 // common/js/event-log.js 공통 컴포넌트가 그린다(장비 실시간 화면과 공유). 이 파일은 조회 조건,
 // 요약 타일, 압축기 탭과 데이터 불러오기만 맡는다.
 
-const REGIONS = ["A지구", "B지구", "C지구"];
 
 const state = {
   equipments: [], // GET /api/equipments 전체
@@ -63,8 +62,8 @@ async function loadEquipments() {
   }
 
   const select = document.getElementById("dqRegion");
-  const available = REGIONS.filter((r) => state.equipments.some((e) => e.region === r));
-  select.innerHTML = `<option value="">선택</option>` + available.map((r) => `<option value="${r}">${r}</option>`).join("");
+  const available = collectRegions(state.equipments);
+  select.innerHTML = `<option value="">선택</option>` + available.map((r) => `<option value="${escapeHtml(r)}">${escapeHtml(r)}</option>`).join("");
 }
 
 // ---------- 지역 → 시설동 → 설비 ----------

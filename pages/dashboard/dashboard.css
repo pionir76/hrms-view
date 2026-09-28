@@ -244,7 +244,7 @@ body.page-dashboard {
 
 /* 전체 장비 카드의 미운영 수량 — 약하게 */
 .db-kpi-extra {
-  margin-left: 12px;
+  margin-left: 8px;
   padding: 2px 8px;
   border-radius: 6px;
   background: #f1f3f7;
@@ -883,6 +883,13 @@ body.page-dashboard {
 }
 
 /* 색 통일: 통신 = 주황, 경보 = 빨강(지구 머리·필터 칩의 점과 같은 색) */
+/* 통신이 끊기면 경보 여부를 알 수 없다 — 꺼진 상태와 구분되게 점선으로 표시 */
+.db-onoff.unknown {
+  border-style: dashed;
+  border-color: #c3c9d4;
+  color: #aeb5c2;
+}
+
 .db-onoff.alarm.on {
   background: #e0364d;
   border-color: #e0364d;

@@ -24,8 +24,14 @@ async function apiRequestRaw(path, options = {}) {
     } catch {
       // 응답 본문을 못 읽어도 상태코드 기반 메시지로는 처리할 수 있으니 무시한다.
     }
-    const err = new Error(parseErrorBody(bodyText) || `API 요청 실패 (${res.status})`);
+    // 서버 오류(5xx)에는 traceId가 실려 온다(백엔드 2026-09-28) — 서버 로그에서 이 요청을
+    // 바로 찾을 수 있는 번호라, 사용자에게 보이는 문구에 같이 붙여준다. 4xx는 원인이 이미
+    // 메시지에 있으므로 붙이지 않는다.
+    const traceId = parseTraceId(bodyText);
+    const message = parseErrorBody(bodyText) || `API 요청 실패 (${res.status})`;
+    const err = new Error(traceId && res.status >= 500 ? `${message} [추적번호: ${traceId}]` : message);
     err.status = res.status;
+    err.traceId = traceId;
     throw err;
   }
 
@@ -59,6 +65,21 @@ function parseErrorBody(text) {
   } catch {
     return text;
   }
+}
+
+// 500 응답의 traceId(ProblemDetails 확장 필드). 대소문자 표기가 바뀌어도 잡히게 둘 다 본다.
+function parseTraceId(text) {
+  if (!text) return null;
+  try {
+    const parsed = JSON.parse(text);
+    if (parsed && typeof parsed === "object") {
+      const traceId = parsed.traceId ?? parsed.TraceId;
+      return typeof traceId === "string" && traceId ? traceId : null;
+    }
+  } catch {
+    // JSON이 아니면 traceId도 없다
+  }
+  return null;
 }
 
 async function apiFetch(path, options = {}) {

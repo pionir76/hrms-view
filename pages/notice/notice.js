@@ -162,9 +162,9 @@ async function openNoticeDetail(itemId) {
   fillNoticeForm(item);
   applyNoticePermissions(item);
   openModal();
+  noticeDirty.capture(); // 첨부 조회를 기다리는 사이의 입력이 기준값에 섞이지 않게 먼저 잡는다
 
   await loadNoticeAttachments(item.id);
-  noticeDirty.capture();
 }
 
 function startNoticeNewDraft() {

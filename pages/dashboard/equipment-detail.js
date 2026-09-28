@@ -47,8 +47,15 @@ function commBadge(status) {
 
 // 장비 기준 경보 상태 — 소속 압축기 중 하나라도 경보가 확정되면 장비 hasAlarm이 true(api-manual 1번).
 // 압축기별 경보 상태는 표에서 빼고 장비명 아래에 이 배지 하나로만 보여준다(사용자 결정).
-function equipmentAlarmBadge(hasAlarm) {
-  return hasAlarm ? `<span class="badge badge-alarm">경보발생</span>` : `<span class="badge badge-normal">정상</span>`;
+//
+// 통신이 끊기면(또는 장비가 비운전이면) 백엔드가 hasAlarm을 **항상 false**로 내린다(백엔드 변경
+// 2026-09-28). 그대로 두면 "경보 없음(정상)"과 "통신이 끊겨 알 수 없음"이 똑같이 "정상"으로 보이므로,
+// 통신 상태를 먼저 판정해서 구분한다.
+function equipmentAlarmBadge(equipment) {
+  if (equipment.communicationStatus !== "연결됨") {
+    return `<span class="badge badge-warning" title="통신이 끊겨 경보 여부를 알 수 없습니다">통신 불량</span>`;
+  }
+  return equipment.hasAlarm ? `<span class="badge badge-alarm">경보발생</span>` : `<span class="badge badge-normal">정상</span>`;
 }
 
 function isViewingToday() {
@@ -167,7 +174,7 @@ async function loadUtilization() {
 function renderEquipmentStatus(equipment) {
   document.getElementById("equipmentSubtitle").textContent =
     `${equipment.region} · ${equipment.buildingName} · 운영 상태: ${equipment.status}`;
-  document.getElementById("equipmentAlarmBadge").innerHTML = equipmentAlarmBadge(equipment.hasAlarm);
+  document.getElementById("equipmentAlarmBadge").innerHTML = equipmentAlarmBadge(equipment);
   document.getElementById("statRunningState").textContent = equipment.isRunning ? "운전중" : "정지";
   document.getElementById("statRunningTile").classList.toggle("is-stopped", !equipment.isRunning);
 }

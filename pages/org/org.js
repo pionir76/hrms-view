@@ -22,7 +22,6 @@ const ORG_ROLES = [
   { role: "안전관리원", cls: "role-3" },
   { role: "일반관리원", cls: "role-4" },
 ];
-const REGION_ORDER = ["A지구", "B지구", "C지구"];
 const REPORT_OWNER_TYPE = "AppointmentReport";
 
 const orgState = {
@@ -168,16 +167,11 @@ async function downloadReport(userId) {
 // ---------- 담당장비 묶기 (지역 → 시설동) ----------
 
 function groupEquipments(equipments) {
-  const regionIndex = (r) => {
-    const i = REGION_ORDER.indexOf(r);
-    return i < 0 ? REGION_ORDER.length : i;
-  };
   const sorted = equipments
     .slice()
     .sort(
       (a, b) =>
-        regionIndex(a.region) - regionIndex(b.region) ||
-        String(a.region).localeCompare(String(b.region), "ko") ||
+        compareRegion(a.region, b.region) ||
         String(a.buildingName).localeCompare(String(b.buildingName), "ko") ||
         String(a.name).localeCompare(String(b.name), "ko")
     );

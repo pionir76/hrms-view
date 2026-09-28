@@ -265,7 +265,6 @@ function openLogoutConfirm() {
 // ---------- 내 정보 (읽기 전용) ----------
 
 let layoutEquipmentsCache = null; // 담당장비 이름·지역·시설동 매칭용 — 모달을 여러 번 열어도 한 번만 받는다
-const LAYOUT_REGION_ORDER = ["A지구", "B지구", "C지구"];
 
 function openProfileModal() {
   const modal = ensureLayoutModal(
@@ -406,10 +405,9 @@ function renderProfileEquipments(equipmentIds) {
     return;
   }
 
-  const regionIndex = (r) => (LAYOUT_REGION_ORDER.indexOf(r) < 0 ? LAYOUT_REGION_ORDER.length : LAYOUT_REGION_ORDER.indexOf(r));
   equipments.sort(
     (a, b) =>
-      regionIndex(a.region) - regionIndex(b.region) ||
+      compareRegion(a.region, b.region) ||
       String(a.buildingName).localeCompare(String(b.buildingName), "ko") ||
       String(a.name).localeCompare(String(b.name), "ko")
   );

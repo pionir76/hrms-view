@@ -1,6 +1,5 @@
 // 운전일지 페이지 전용 스크립트
 
-const REGIONS = ["A지구", "B지구", "C지구"];
 const DAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 const TIME_SLOTS = ["time0900", "time1300", "time1600", "time2100"];
 const TIME_SLOT_LABELS = ["09:00", "13:00", "16:00", "21:00"];
@@ -116,7 +115,7 @@ async function initOperationPage() {
     state.equipments = await apiFetch("/api/equipments");
   } catch (err) {
     document.getElementById("calendarArea").innerHTML =
-      `<div class="empty-state">장비 목록을 불러오지 못했습니다. (${err.message})</div>`;
+      `<div class="empty-state">장비 목록을 불러오지 못했습니다. (${escapeHtml(err.message)})</div>`;
     return;
   }
 
@@ -167,8 +166,8 @@ function populateYearMonthSelects() {
 
 function populateRegionSelect() {
   const select = document.getElementById("regionSelect");
-  const availableRegions = REGIONS.filter((r) => state.equipments.some((e) => e.region === r));
-  select.innerHTML = `<option value="">선택</option>` + availableRegions.map((r) => `<option value="${r}">${r}</option>`).join("");
+  const availableRegions = collectRegions(state.equipments);
+  select.innerHTML = `<option value="">선택</option>` + availableRegions.map((r) => `<option value="${escapeHtml(r)}">${escapeHtml(r)}</option>`).join("");
 }
 
 function resetSelect(select, placeholder) {
@@ -195,7 +194,7 @@ function onRegionChange() {
   const buildings = [...new Set(state.equipments.filter((e) => e.region === region).map((e) => e.buildingName))].sort(
     (a, b) => a.localeCompare(b, "ko")
   );
-  buildingSelect.innerHTML = `<option value="">선택</option>` + buildings.map((b) => `<option value="${b}">${b}</option>`).join("");
+  buildingSelect.innerHTML = `<option value="">선택</option>` + buildings.map((b) => `<option value="${escapeHtml(b)}">${escapeHtml(b)}</option>`).join("");
   buildingSelect.disabled = false;
   renderCalendarPlaceholder("좌측에서 시설동 · 설비를 선택하세요.");
 }
@@ -219,7 +218,7 @@ function onBuildingChange() {
     .filter((e) => e.region === region && e.buildingName === buildingName)
     .sort((a, b) => a.name.localeCompare(b.name, "ko"));
   equipmentSelect.innerHTML =
-    `<option value="">선택</option>` + equipments.map((e) => `<option value="${e.id}">${e.name}</option>`).join("");
+    `<option value="">선택</option>` + equipments.map((e) => `<option value="${e.id}">${escapeHtml(e.name)}</option>`).join("");
   equipmentSelect.disabled = false;
   renderCalendarPlaceholder("좌측에서 설비를 선택하세요.");
 }
@@ -249,7 +248,7 @@ async function onEquipmentChange() {
     state.compressors = await apiFetch(`/api/equipments/${equipmentId}/compressors`);
     await loadChannelSettings(state.compressors);
   } catch (err) {
-    renderCalendarPlaceholder(`압축기 정보를 불러오지 못했습니다. (${err.message})`);
+    renderCalendarPlaceholder(`압축기 정보를 불러오지 못했습니다. (${escapeHtml(err.message)})`);
     return;
   }
 
@@ -291,7 +290,7 @@ function renderSelectionSummary() {
   if (buildingName) parts.push(buildingName);
   if (state.equipmentId && state.equipmentName) parts.push(state.equipmentName);
 
-  el.innerHTML = parts.map((p) => `<span class="selection-part">${p}</span>`).join(`<span class="selection-sep">›</span>`);
+  el.innerHTML = parts.map((p) => `<span class="selection-part">${escapeHtml(p)}</span>`).join(`<span class="selection-sep">›</span>`);
 }
 
 function renderCalendarTitleOnly() {
@@ -384,6 +383,19 @@ function isAnyApproved() {
   return isApprovalStarted(modalState);
 }
 
+// 결재가 하나라도 진행되면 읽기 전용 — 점검일지와 같은 규칙으로 맞춘다(사용자 결정 2026-09-28).
+// 백엔드는 운전일지 저장을 막지 않으므로(api-manual 18번) 잠그는 책임이 프론트에 있다.
+// 결재된 문서의 값이 나중에 조용히 바뀌면 법정 일지로서 신뢰할 수 없게 된다.
+function isDocLocked() {
+  return isApprovalStarted(modalState);
+}
+
+// 저장 안 한 채 닫거나 결재하면 입력이 사라지므로, 연 시점 값을 기준으로 잡아 비교한다
+const operationDirty = createDirtyTracker(() => ({
+  items: modalState.items,
+  references: modalState.references,
+}));
+
 function isFullyApproved() {
   return isApprovalComplete(modalState);
 }
@@ -419,7 +431,7 @@ async function loadCalendar() {
   try {
     logs = await Promise.all(dateStrs.map((ds) => apiFetch(`/api/operation-logs?equipmentId=${equipmentId}&date=${ds}`)));
   } catch (err) {
-    calendarArea.innerHTML = `<div class="empty-state">불러오지 못했습니다. (${err.message})</div>`;
+    calendarArea.innerHTML = `<div class="empty-state">불러오지 못했습니다. (${escapeHtml(err.message)})</div>`;
     return;
   }
 
@@ -484,12 +496,45 @@ async function openOperationModal(dateStr) {
     applyLogResponse(log);
 
     renderModalBody();
+    operationDirty.capture();
   } catch (err) {
-    modalBody.innerHTML = `<div class="empty-state">불러오지 못했습니다. (${err.message})</div>`;
+    operationDirty.reset();
+    modalBody.innerHTML = `<div class="empty-state">불러오지 못했습니다. (${escapeHtml(err.message)})</div>`;
   }
 }
 
+// 화면에 그려진 표를 그대로 엑셀로 내려받는다(common/js/excel-export.js).
+// 표 모양은 압축기 수에 따라 달라지지만, 변환기가 그려진 표를 훑기 때문에 여기서 따로
+// 신경 쓸 게 없다. 나중에 "한 달치 한 번에"가 필요해지면 sheets 배열에 날짜별 표를
+// 여러 개 넣으면 된다 — 지금은 열려 있는 하루치 1건만 넣는다.
+async function exportOperationLogToExcel() {
+  const dateObj = new Date(modalState.date);
+  await withGlobalBusy(
+    () =>
+      exportLogToExcel({
+        fileName: excelFileName(["운전일지", modalState.region, modalState.equipmentName, modalState.date]),
+        sheets: [
+          {
+            name: modalState.date,
+            title: "운전일지",
+            info: [
+              ["지역", modalState.region],
+              ["시설동", modalState.buildingName],
+              ["장비명", modalState.equipmentName],
+              ["날짜", `${formatDateKo(modalState.date)} (${DAY_LABELS[dateObj.getDay()]})`],
+            ],
+            approvals: approvalsForExcel(modalState),
+            table: document.querySelector(".op-table"),
+          },
+        ],
+      }),
+    { label: "엑셀 파일 만드는 중..." }
+  );
+}
+
 function closeOperationModal() {
+  if (!confirmDiscardIfDirty(operationDirty)) return;
+  operationDirty.reset();
   document.getElementById("operationModal").hidden = true;
 }
 
@@ -505,19 +550,20 @@ function applyLogResponse(log) {
 function renderModalBody() {
   const session = getSession();
   const fullyApproved = isFullyApproved();
+  const locked = isDocLocked();
   const dateObj = new Date(modalState.date);
 
   const html = `
     <div class="op-report-header">
       <div class="op-report-meta">
-        <span class="op-meta-chip">${modalState.region}</span>
-        <span class="op-meta-chip">${modalState.buildingName}</span>
-        <span class="op-meta-chip op-meta-chip-primary">${modalState.equipmentName}</span>
+        <span class="op-meta-chip">${escapeHtml(modalState.region)}</span>
+        <span class="op-meta-chip">${escapeHtml(modalState.buildingName)}</span>
+        <span class="op-meta-chip op-meta-chip-primary">${escapeHtml(modalState.equipmentName)}</span>
       </div>
       <span class="op-report-date-badge">${formatDateKo(modalState.date)} (${DAY_LABELS[dateObj.getDay()]})</span>
     </div>
 
-    ${fullyApproved ? `<div class="op-approved-note">결재가 완료된 문서입니다. 수정 시 이미 승인된 값과 실제 기록이 달라질 수 있으니 주의하세요.</div>` : ""}
+    ${locked ? `<div class="op-approved-note">${fullyApproved ? "결재가 완료된" : "결재가 진행된"} 문서라 읽기 전용입니다. 다시 수정하려면 시스템관리자의 결재 리셋이 필요합니다.</div>` : ""}
     <div class="op-error" id="opError" hidden></div>
 
     <div class="approval-bar" id="approvalBar"></div>
@@ -552,8 +598,9 @@ function renderModalBody() {
           : ""}
       </div>
       <div class="footer-right">
+        <button type="button" class="btn btn-secondary" id="exportExcelBtn">엑셀 저장</button>
         <button type="button" class="btn btn-secondary" id="modalCancelBtn">닫기</button>
-        <button type="button" class="btn btn-primary" id="saveOperationBtn">저장</button>
+        ${locked ? "" : `<button type="button" class="btn btn-primary" id="saveOperationBtn">저장</button>`}
       </div>
     </div>
   `;
@@ -563,8 +610,10 @@ function renderModalBody() {
   renderOperationApprovalBar();
   renderReportTable(buildReportRows(state.compressors));
 
+  document.getElementById("exportExcelBtn").addEventListener("click", exportOperationLogToExcel);
   document.getElementById("modalCancelBtn").addEventListener("click", closeOperationModal);
-  document.getElementById("saveOperationBtn").addEventListener("click", saveOperationLog);
+  const saveBtn = document.getElementById("saveOperationBtn");
+  if (saveBtn) saveBtn.addEventListener("click", () => saveOperationLog());
   const resetBtn = document.getElementById("resetApprovalBtn");
   if (resetBtn) resetBtn.addEventListener("click", resetApprovals);
 }
@@ -590,11 +639,12 @@ function renderOperationApprovalBar() {
 }
 
 async function approveLevel() {
-  if (!window.confirm("결재하시겠습니까?")) return;
+  if (!(await confirmBeforeApprove(operationDirty, () => saveOperationLog({ askConfirm: false, closeAfter: false })))) return;
   try {
     const updated = await apiFetch(`/api/operation-logs/${modalState.id}/approve`, { method: "POST" });
     applyLogResponse(updated);
     renderModalBody();
+    operationDirty.capture();
     loadCalendar();
   } catch (err) {
     showOpError(err);
@@ -607,6 +657,7 @@ async function cancelApproval() {
     const updated = await apiFetch(`/api/operation-logs/${modalState.id}/approve/cancel`, { method: "POST" });
     applyLogResponse(updated);
     renderModalBody();
+    operationDirty.capture();
     loadCalendar();
   } catch (err) {
     showOpError(err);
@@ -618,6 +669,7 @@ async function resetApprovals() {
     const updated = await apiFetch(`/api/operation-logs/${modalState.id}/approvals/reset`, { method: "POST" });
     applyLogResponse(updated);
     renderModalBody();
+    operationDirty.capture();
     loadCalendar();
   } catch (err) {
     showOpError(err);
@@ -780,7 +832,7 @@ function renderValueCell(row, slot) {
     const value = getItemSlotRaw(row.itemKey, row.compressorId, slot);
     return `
       <td>
-        <button type="button" class="ox-toggle-btn ${oxCellClass(value)}" data-item-key="${escapeAttr(row.itemKey)}" data-slot="${slot}">${oxToggleSymbol(value)}</button>
+        <button type="button" class="ox-toggle-btn ${oxCellClass(value)}" data-item-key="${escapeAttr(row.itemKey)}" data-slot="${slot}"${isDocLocked() ? " disabled" : ""}>${oxToggleSymbol(value)}</button>
       </td>
     `;
   }
@@ -800,6 +852,7 @@ function renderValueCell(row, slot) {
         data-slot="${slot}"
         data-dp="${dp === null || dp === undefined ? "" : dp}"
         value="${escapeAttr(display)}"
+        ${isDocLocked() ? "disabled" : ""}
       />
     </td>
   `;
@@ -829,6 +882,7 @@ function wireTableEvents(tbody) {
     });
   });
 
+  if (isDocLocked()) return; // 잠긴 문서는 실측 기준도 못 고친다
   tbody.querySelectorAll(".op-ref-display").forEach((el) => {
     el.addEventListener("click", () => {
       openRefEditModal(el.dataset.refKey, el.dataset.itemLabel, el.dataset.currentValue);
@@ -943,8 +997,9 @@ function escapeAttr(value) {
 
 // ---------- 저장 ----------
 
-async function saveOperationLog() {
-  if (!window.confirm("저장하시겠습니까?")) return;
+// 결재 전 자동 저장에서도 부르므로 성공하면 true를 돌려준다(approval.js confirmBeforeApprove).
+async function saveOperationLog({ askConfirm = true, closeAfter = true } = {}) {
+  if (askConfirm && !window.confirm("저장하시겠습니까?")) return false;
 
   const payload = {
     equipmentId: Number(modalState.equipmentId),
@@ -969,9 +1024,12 @@ async function saveOperationLog() {
       body: JSON.stringify(payload),
     });
     loadCalendar();
-    closeOperationModal();
+    operationDirty.capture();
+    if (closeAfter) closeOperationModal();
+    return true;
   } catch (err) {
     showOpError(err);
+    return false;
   }
 }
 
