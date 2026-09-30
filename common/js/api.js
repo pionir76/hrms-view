@@ -32,6 +32,7 @@ async function apiRequestRaw(path, options = {}) {
     const err = new Error(traceId && res.status >= 500 ? `${message} [추적번호: ${traceId}]` : message);
     err.status = res.status;
     err.traceId = traceId;
+    err.bodyText = bodyText; // 같은 상태코드라도 본문 모양으로 경우를 가를 때 쓴다(예: 비상정지 75번의 400)
     throw err;
   }
 

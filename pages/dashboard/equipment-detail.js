@@ -11,6 +11,7 @@
 //   가동율         GET /api/equipments/{id}/utilization?from= (7번)
 //   그날 이벤트    GET /api/equipments/{id}/events?date=     (58번) — 예전에는 전체 이벤트 200건(9번)을
 //                  받아 이 장비 것만 걸렀는데, 다른 장비 이벤트가 많으면 이 장비 것이 잘려 나갔다.
+//   비상정지       POST /api/equipments/{id}/emergency-stop(/release) (75·76번)
 //
 // 오늘 날짜를 보고 있으면 이벤트는 10초, 트렌드·가동율은 60초마다 다시 불러온다(트렌드 기록이
 // 분 단위라 더 자주 받아도 달라지는 게 없다). 다시 그려도 보던 시간 구간·선택 채널·필터는 유지된다.
@@ -52,6 +53,8 @@ function commBadge(status) {
 // 2026-09-28). 그대로 두면 "경보 없음(정상)"과 "통신이 끊겨 알 수 없음"이 똑같이 "정상"으로 보이므로,
 // 통신 상태를 먼저 판정해서 구분한다.
 function equipmentAlarmBadge(equipment) {
+  // 비상정지 중이면 운전이 멈춰 경보 판정도 없으므로 이 배지를 가장 먼저 보여준다(모든 역할에게)
+  if (equipment.isEmergencyStopped) return `<span class="badge badge-emg">비상정지 중</span>`;
   if (equipment.communicationStatus !== "연결됨") {
     return `<span class="badge badge-warning" title="통신이 끊겨 경보 여부를 알 수 없습니다">통신 불량</span>`;
   }
@@ -102,8 +105,7 @@ async function initEquipmentDetail() {
   renderCompressorSummary();
   populateCompressorTableHead();
   renderCompressorTable();
-  populateEmergencyCompressorSelect();
-  setupEmergencyModal(equipment);
+  setupEmergencyModal();
 
   if (state.compressors.length > 0) {
     refreshChannelValues();
@@ -177,6 +179,7 @@ function renderEquipmentStatus(equipment) {
   document.getElementById("equipmentAlarmBadge").innerHTML = equipmentAlarmBadge(equipment);
   document.getElementById("statRunningState").textContent = equipment.isRunning ? "운전중" : "정지";
   document.getElementById("statRunningTile").classList.toggle("is-stopped", !equipment.isRunning);
+  renderEmergencyCard();
 }
 
 // 장비 경보·운전 상태와 압축기 통신 상태를 다시 받는다. 실패하면 지금 표시를 그대로 두고 다음 주기에 재시도.
@@ -300,17 +303,6 @@ function selectCompressor(compressorId) {
   loadTrend(); // 보던 시간 구간·선택 채널은 컴포넌트가 유지한다
 }
 
-function populateEmergencyCompressorSelect() {
-  const select = document.getElementById("emergencyCompressorSelect");
-  if (state.compressors.length === 0) {
-    select.innerHTML = `<option value="">선택 가능한 압축기가 없습니다</option>`;
-    return;
-  }
-  select.innerHTML = state.compressors
-    .map((c) => `<option value="${c.id}">COMP #${c.sequenceNo} (${escapeHtml(c.ipAddress || "IP 없음")})</option>`)
-    .join("");
-}
-
 // ---------- 트렌드 ----------
 
 function selectedCompressorLabel() {
@@ -388,39 +380,150 @@ async function loadEvents({ silent = false } = {}) {
   if (silent && rangesChanged) renderTrend();
 }
 
-// ---------- 비상정지 (API 미구현 — 확인 절차 UI만) ----------
+// ---------- 비상정지 (75·76번) ----------
+//
+// 장비 단위다 — DO 출력이 장비의 비상정지 회로에 물려 있어 압축기 한 대만 따로 멈출 수 없다.
+// 버튼 하나가 현재 상태(isEmergencyStopped)에 따라 정지/해제로 바뀐다. 재확인은 프론트 몫이다.
+// 정지할 때만 비밀번호를 받아 75번 본문으로 보내고 서버가 검증한다(틀리면 400). 해제는 묻지 않는다.
+// 성공 200 / 실패 409 — 실패 본문의 message가 apiFetch 오류 메시지로 그대로 올라온다.
+//
+// 카드는 서버 권한과 같은 역할(시스템관리자·안전관리총괄자·안전관리책임자)에게만 보인다.
+// 숨기는 건 화면 정리일 뿐이고, 실제 차단은 서버(403)가 한다.
+const EMERGENCY_STOP_ROLES = ["시스템관리자", "안전관리총괄자", "안전관리책임자"];
 
-function setupEmergencyModal(equipment) {
+function canEmergencyStop() {
+  const session = getSession();
+  return !!(session && EMERGENCY_STOP_ROLES.includes(session.role));
+}
+
+// 75번의 400은 비밀번호 오류 전용이고 본문이 { message }다. 요청 JSON이 깨진 경우의 ASP.NET 기본
+// 400(ProblemDetails)에는 message가 없으므로, message가 있을 때만 비밀번호 오류로 본다.
+function isPasswordError(err) {
+  if (err.status !== 400 || !err.bodyText) return false;
+  try {
+    const body = JSON.parse(err.bodyText);
+    return !!(body && typeof body.message === "string");
+  } catch {
+    return false;
+  }
+}
+
+function isEmergencyStopped() {
+  return !!(state.equipment && state.equipment.isEmergencyStopped);
+}
+
+function renderEmergencyCard() {
+  const stopped = isEmergencyStopped();
+  document.getElementById("emergencyCard").classList.toggle("is-active", stopped);
+  document.getElementById("emergencyTitle").innerHTML = stopped ? `<span class="emg-dot"></span>비상정지 중` : "비상정지";
+  document.getElementById("emergencyNote").textContent = stopped
+    ? "장비가 비상정지 상태입니다. 현장 안전을 확인한 뒤 해제하세요."
+    : "장비 전체(소속 압축기 모두)가 즉시 정지됩니다.";
+  document.getElementById("emergencyStopBtn").textContent = stopped ? "비상정지 해제" : "비상정지";
+}
+
+function setupEmergencyModal() {
+  if (!canEmergencyStop()) return; // 카드는 hidden 그대로
+  document.getElementById("emergencyCard").hidden = false;
+
   const modal = document.getElementById("emergencyModal");
+  const icon = document.getElementById("emergencyModalIcon");
+  const title = document.getElementById("emergencyModalTitle");
   const openBtn = document.getElementById("emergencyStopBtn");
   const cancelBtn = document.getElementById("emergencyCancelBtn");
   const confirmBtn = document.getElementById("emergencyConfirmBtn");
   const confirmText = document.getElementById("emergencyConfirmText");
-  const select = document.getElementById("emergencyCompressorSelect");
+  const pwField = document.getElementById("emergencyPwField");
+  const pwInput = document.getElementById("emergencyPassword");
+  const pwHint = document.getElementById("emergencyPwHint");
+  let release = false; // 모달을 연 시점의 동작 — 열려 있는 동안 폴링으로 상태가 바뀌어도 고정
+  let sending = false;
 
-  function openModal() {
-    confirmText.textContent = `${equipment.name}의 선택한 압축기에 비상정지 명령을 전송합니다. 계속하시겠습니까?`;
-    confirmBtn.disabled = state.compressors.length === 0;
-    select.hidden = false;
-    confirmBtn.hidden = false;
-    cancelBtn.textContent = "취소";
-    modal.hidden = false;
+  function setPwError(message) {
+    pwInput.classList.toggle("is-error", !!message);
+    pwHint.classList.toggle("is-error", !!message);
+    pwHint.textContent = message || "입력 후 Enter 키로도 전송됩니다.";
   }
 
-  function closeModal() {
-    modal.hidden = true;
+  function syncConfirmEnabled() {
+    confirmBtn.disabled = sending || (!release && pwInput.value === "");
+  }
+
+  function openModal() {
+    release = isEmergencyStopped();
+    sending = false;
+    icon.toggleAttribute("hidden", release); // SVG는 .hidden 속성이 없어 attribute로 건다
+    title.textContent = release ? "비상정지 해제 재확인" : "비상정지 재확인";
+    confirmText.innerHTML = release
+      ? "비상정지를 해제합니다.<br />해제 후 장비가 다시 운전할 수 있는 상태가 됩니다. 계속하시겠습니까?"
+      : "이 장비에 <b>비상정지</b> 명령을 전송합니다.<br />소속 압축기 전체가 즉시 정지됩니다.";
+    pwField.hidden = release;
+    pwInput.value = "";
+    setPwError(null);
+    confirmBtn.className = release ? "btn btn-primary" : "btn btn-danger";
+    confirmBtn.textContent = release ? "해제" : "비상정지 전송";
+    confirmBtn.hidden = false;
+    cancelBtn.disabled = false;
+    cancelBtn.textContent = "취소";
+    syncConfirmEnabled();
+    modal.hidden = false;
+    if (!release) pwInput.focus();
+  }
+
+  function showResult(text) {
+    confirmText.textContent = text;
+    pwField.hidden = true;
+    confirmBtn.hidden = true;
+    cancelBtn.disabled = false;
+    cancelBtn.textContent = "닫기";
+  }
+
+  async function send() {
+    if (sending || confirmBtn.hidden || confirmBtn.disabled) return;
+    sending = true; // 중복 전송 방지(서버도 처리 중이면 409)
+    syncConfirmEnabled();
+    cancelBtn.disabled = true;
+    pwInput.disabled = true;
+    const path = `/api/equipments/${state.equipmentId}/emergency-stop${release ? "/release" : ""}`;
+    const options = release ? { method: "POST" } : { method: "POST", body: JSON.stringify({ password: pwInput.value }) };
+    try {
+      const result = await apiFetch(path, options);
+      state.equipment.isEmergencyStopped = result.isEmergencyStopped;
+      renderEquipmentStatus(state.equipment);
+      showResult(result.confirmed ? result.message : `${result.message} 잠시 후 화면에 반영됩니다.`);
+    } catch (err) {
+      if (!release && isPasswordError(err)) {
+        // 비밀번호 불일치 — 팝업을 닫지 않고 그 자리에서 다시 입력받는다
+        sending = false;
+        cancelBtn.disabled = false;
+        pwInput.disabled = false;
+        pwInput.value = "";
+        setPwError(err.message);
+        syncConfirmEnabled();
+        pwInput.focus();
+        return;
+      }
+      if (err.status === 403) showResult("비상정지 권한이 없습니다.");
+      else if (err.status === 404) showResult("장비를 찾을 수 없습니다.");
+      else showResult(err.message);
+    } finally {
+      pwInput.disabled = false;
+    }
+    refreshStatus(); // 실패해도 서버의 현재 상태로 카드를 맞춘다
   }
 
   openBtn.addEventListener("click", openModal);
-  cancelBtn.addEventListener("click", closeModal);
-
-  confirmBtn.addEventListener("click", () => {
-    const compressorId = select.value;
-    confirmText.textContent =
-      `비상정지 API가 아직 준비되지 않아 압축기 ${compressorId}에 실제 명령은 전송되지 않았습니다. (TODO.md 1-1번 참고)`;
-    select.hidden = true;
-    confirmBtn.hidden = true;
-    cancelBtn.textContent = "닫기";
+  cancelBtn.addEventListener("click", () => {
+    modal.hidden = true;
+    pwInput.value = ""; // 비밀번호를 화면에 남겨두지 않는다
+  });
+  confirmBtn.addEventListener("click", send);
+  pwInput.addEventListener("input", () => {
+    setPwError(null);
+    syncConfirmEnabled();
+  });
+  pwInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") send();
   });
 }
 

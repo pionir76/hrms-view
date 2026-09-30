@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<title>비상정지 시안</title>
+<link rel="stylesheet" href="../common/css/common.css" />
+<link rel="stylesheet" href="../pages/dashboard/equipment-detail.css" />
+<style>
+  body { background: var(--color-bg, #f4f6fb); padding: 28px; width: 1560px; }
+  .cols { display: grid; grid-template-columns: 300px 300px 1fr; gap: 28px; align-items: start; }
+  .col-title { margin: 0 0 12px; font-size: 13px; font-weight: 800; color: #002c5f; }
+  .col-title small { display: block; margin-top: 2px; font-weight: 500; color: var(--color-text-muted); }
+  .rail { display: flex; flex-direction: column; gap: 14px; }
+  .modals { display: flex; flex-direction: column; gap: 22px; }
+  .modal-stage { position: relative; padding: 26px; border-radius: 14px; background: rgba(16, 24, 40, 0.45); display: flex; justify-content: center; gap: 20px; }
+  .modal-stage .modal-box { margin: 0; }
+  .note-box { padding: 12px 14px; border: 1px dashed var(--color-border-strong); border-radius: 10px; font-size: 12.5px; color: var(--color-text-sub); background: #fff; }
+
+  /* ===== 시안: 비상정지 카드 ===== */
+
+  /* 평상시 — 지금 모양 그대로 */
+
+  /* 비상정지 중 — 카드 전체를 빨간 면으로 뒤집고 버튼은 흰 바탕 빨간 글자 */
+  .detail-emergency.is-active {
+    background: linear-gradient(160deg, #e0362a, #b42318);
+    border-color: #b42318;
+    color: #fff;
+    box-shadow: 0 0 0 3px rgba(217, 45, 32, 0.22), 0 10px 24px -10px rgba(180, 35, 24, 0.7);
+  }
+  .detail-emergency.is-active .detail-card-title { display: flex; align-items: center; gap: 8px; color: #fff; }
+  .detail-emergency.is-active .detail-card-title::before { display: none; }
+  .detail-emergency.is-active .detail-emergency-note { color: rgba(255, 255, 255, 0.92); font-weight: 600; }
+  .emg-dot { position: relative; width: 10px; height: 10px; border-radius: 50%; background: #fff; }
+  .emg-dot::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.7); animation: emg-pulse 1.4s ease-out infinite; }
+  @keyframes emg-pulse { from { transform: scale(0.6); opacity: 1; } to { transform: scale(1.6); opacity: 0; } }
+  .btn-emg-release { width: 100%; background: #fff; color: #b42318; font-weight: 800; }
+  .btn-emg-release:hover { background: #fff1f0; }
+
+  /* 장비명 옆 배지 */
+  .badge-emg { background: #d92d20; color: #fff; font-weight: 800; }
+
+  /* 재확인 모달 */
+  .emg-modal-head { display: flex; align-items: center; gap: 8px; }
+  .emg-modal-head svg { width: 20px; height: 20px; fill: none; stroke: #d92d20; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .emg-modal-text { margin: 0 0 14px; }
+  .emg-modal-text b { color: #b42318; }
+  .emg-pw-hint { margin-top: 6px; font-size: 12px; color: var(--color-text-muted); }
+  .emg-pw-error { margin-top: 6px; font-size: 12px; font-weight: 600; color: #d92d20; }
+  .field input.is-error { border-color: #d92d20; }
+</style>
+</head>
+<body>
+  <div class="cols">
+    <!-- 1. 평상시 -->
+    <div>
+      <p class="col-title">① 평상시<small>안전관리책임자·총괄자·시스템관리자만 카드가 보임</small></p>
+      <div class="rail">
+        <div class="panel detail-card">
+          <span class="page-eyebrow">Live Equipment</span>
+          <h1>냉동기 A-101</h1>
+          <p class="detail-subtitle"><span>A지구 · 본관</span> <span class="badge badge-normal">정상</span></p>
+        </div>
+        <div class="stat-tile stat-tile-teal">
+          <div class="stat-tile-top">
+            <span class="stat-tile-icon"><svg viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z" /></svg></span>
+            <span class="stat-tile-label">운전상태</span>
+          </div>
+          <div class="stat-tile-value">운전중</div>
+          <div class="stat-tile-sub">10초마다 갱신</div>
+        </div>
+        <div class="panel detail-card detail-emergency">
+          <h2 class="section-title detail-card-title">비상정지</h2>
+          <p class="detail-emergency-note">장비 전체(소속 압축기 모두)가 즉시 정지됩니다.</p>
+          <button type="button" class="btn btn-danger detail-emergency-btn">비상정지</button>
+        </div>
+        <div class="note-box">안전관리원·일반관리원으로 접속하면 이 비상정지 카드 자체가 없습니다(자리도 비움).</div>
+      </div>
+    </div>
+
+    <!-- 2. 비상정지 중 -->
+    <div>
+      <p class="col-title">② 비상정지 중<small>카드가 빨간 면으로 바뀌고, 장비명 옆에도 배지</small></p>
+      <div class="rail">
+        <div class="panel detail-card">
+          <span class="page-eyebrow">Live Equipment</span>
+          <h1>냉동기 A-101</h1>
+          <p class="detail-subtitle"><span>A지구 · 본관</span> <span class="badge badge-emg">비상정지 중</span></p>
+        </div>
+        <div class="stat-tile stat-tile-teal is-stopped">
+          <div class="stat-tile-top">
+            <span class="stat-tile-icon"><svg viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z" /></svg></span>
+            <span class="stat-tile-label">운전상태</span>
+          </div>
+          <div class="stat-tile-value">정지</div>
+          <div class="stat-tile-sub">10초마다 갱신</div>
+        </div>
+        <div class="panel detail-card detail-emergency is-active">
+          <h2 class="section-title detail-card-title"><span class="emg-dot"></span>비상정지 중</h2>
+          <p class="detail-emergency-note">장비가 비상정지 상태입니다. 현장 안전을 확인한 뒤 해제하세요.</p>
+          <button type="button" class="btn btn-emg-release">비상정지 해제</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. 모달 -->
+    <div>
+      <p class="col-title">③ 재확인 팝업<small>비밀번호는 같은 팝업 안에서 받음(한 단계) · 해제는 비밀번호 없음</small></p>
+      <div class="modals">
+        <div class="modal-stage">
+          <div class="modal-box">
+            <div class="modal-header emg-modal-head">
+              <svg viewBox="0 0 24 24"><path d="M12 3 2 20h20L12 3z" /><path d="M12 10v4M12 17h.01" /></svg>비상정지 재확인
+            </div>
+            <div class="modal-body">
+              <p class="emg-modal-text">이 장비에 <b>비상정지</b> 명령을 전송합니다.<br />소속 압축기 전체가 즉시 정지됩니다.</p>
+              <div class="field">
+                <label>비밀번호 확인</label>
+                <input type="password" value="" placeholder="로그인 비밀번호 입력" />
+                <div class="emg-pw-hint">입력 후 Enter 키로도 전송됩니다.</div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary">취소</button>
+              <button type="button" class="btn btn-danger" disabled>비상정지 전송</button>
+            </div>
+          </div>
+          <div class="modal-box">
+            <div class="modal-header emg-modal-head">
+              <svg viewBox="0 0 24 24"><path d="M12 3 2 20h20L12 3z" /><path d="M12 10v4M12 17h.01" /></svg>비상정지 재확인
+            </div>
+            <div class="modal-body">
+              <p class="emg-modal-text">이 장비에 <b>비상정지</b> 명령을 전송합니다.<br />소속 압축기 전체가 즉시 정지됩니다.</p>
+              <div class="field">
+                <label>비밀번호 확인</label>
+                <input type="password" class="is-error" value="12345678" />
+                <div class="emg-pw-error">비밀번호가 올바르지 않습니다.</div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary">취소</button>
+              <button type="button" class="btn btn-danger">비상정지 전송</button>
+            </div>
+          </div>
+        </div>
+        <div class="modal-stage">
+          <div class="modal-box">
+            <div class="modal-header">비상정지 해제 재확인</div>
+            <div class="modal-body">
+              <p class="emg-modal-text" style="margin: 0">비상정지를 해제합니다.<br />해제 후 장비가 다시 운전할 수 있는 상태가 됩니다. 계속하시겠습니까?</p>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary">취소</button>
+              <button type="button" class="btn btn-primary">해제</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

@@ -101,6 +101,7 @@ const modalState = {
   level3: null,
   items: [], // [{ itemKey, compressorId, time0900..time2100 }]
   references: [], // [{ itemKey, referenceText }]
+  operatingStatus: "", // 장비 운영 상태 — 문서를 연 시점 값(우측 상단·PDF에 글자로 표시)
 };
 
 // 압축기별 채널 설정(decimalPlaces) 캐시. raw ↔ 실값 변환에 사용.
@@ -112,11 +113,18 @@ async function initOperationPage() {
   populateYearMonthSelects();
 
   try {
-    state.equipments = await apiFetch("/api/equipments");
+    // 담당 장비만 — 저장 권한이 담당 기준이라 목록도 같은 기준으로 맞춘다(백엔드 2026-09-28).
+    // 시스템관리자는 mine=true여도 서버가 전체를 준다.
+    state.equipments = await apiFetch("/api/equipments?mine=true");
   } catch (err) {
     document.getElementById("calendarArea").innerHTML =
       `<div class="empty-state">장비 목록을 불러오지 못했습니다. (${escapeHtml(err.message)})</div>`;
     return;
+  }
+
+  // 담당 장비가 하나도 없으면 선택 자체가 불가능하다 — 화면이 고장 난 것으로 오해하지 않게 알려준다
+  if (state.equipments.length === 0) {
+    renderCalendarPlaceholder("담당 장비가 없습니다. 시스템관리자에게 담당 장비 등록을 요청하세요.");
   }
 
   populateRegionSelect();
@@ -486,8 +494,12 @@ async function openOperationModal(dateStr) {
   modalBody.innerHTML = `<div class="empty-state">불러오는 중...</div>`;
 
   try {
-    const log = await apiFetch(`/api/operation-logs?equipmentId=${state.equipmentId}&date=${dateStr}`);
     const equipment = state.equipments.find((e) => String(e.id) === String(state.equipmentId));
+    const [log, operatingStatus] = await Promise.all([
+      apiFetch(`/api/operation-logs?equipmentId=${state.equipmentId}&date=${dateStr}`),
+      fetchEquipmentOperatingStatus(state.equipmentId, equipment ? equipment.status : ""),
+    ]);
+    modalState.operatingStatus = operatingStatus;
     modalState.equipmentId = state.equipmentId;
     modalState.equipmentName = state.equipmentName;
     modalState.region = equipment ? equipment.region : "";
@@ -503,33 +515,121 @@ async function openOperationModal(dateStr) {
   }
 }
 
-// 화면에 그려진 표를 그대로 엑셀로 내려받는다(common/js/excel-export.js).
-// 표 모양은 압축기 수에 따라 달라지지만, 변환기가 그려진 표를 훑기 때문에 여기서 따로
-// 신경 쓸 게 없다. 나중에 "한 달치 한 번에"가 필요해지면 sheets 배열에 날짜별 표를
-// 여러 개 넣으면 된다 — 지금은 열려 있는 하루치 1건만 넣는다.
-async function exportOperationLogToExcel() {
+// ---------- PDF 저장 (common/js/pdf-export.js) ----------
+//
+// 엑셀 저장을 대체한다(사용자 결정 2026-09-29). 점검일지와 같은 규칙 — 결재가 끝난 문서만,
+// 저장 전 문서엔 버튼 없음. A4 세로(시안 mokup/operation_pdf_v1).
+//
+// 표는 화면과 같은 buildReportRows로 만들어 압축기 수(최대 6대)에 따라 행이 늘고 줄어도 모양이
+// 어긋나지 않는다. 계통(구분)마다 <tbody>를 따로 두고, 한 쪽에 들어가는 계통은 쪽 사이에서
+// 잘리지 않게 한다(.op-pdf-keep). 압축기가 많아 한 쪽보다 긴 냉매계통만 행 단위로 나뉜다.
+const OP_PDF_KEEP_MAX_ROWS = 14;
+
+function renderOperationPdfButton() {
+  const btn = document.getElementById("exportPdfBtn");
+  if (!btn) return;
+  const complete = isFullyApproved();
+  btn.disabled = !complete;
+  btn.title = complete ? "" : "결재가 완료된 문서만 PDF로 저장할 수 있습니다";
+}
+
+function operationPdfValueCell(row, slot) {
+  const raw = getItemSlotRaw(row.itemKey, row.compressorId, slot);
+  if (row.kind === "toggle") {
+    return `<td><span class="ox-toggle-btn ${oxCellClass(raw)}">${oxToggleSymbol(raw)}</span></td>`;
+  }
+  const dp = row.auto ? dpFor(row.dpCompressorId, row.channelNo) : null;
+  return `<td class="op-pdf-val">${escapeHtml(toDisplayValue(raw, dp))}</td>`;
+}
+
+// 화면 renderReportTable과 같은 칸 합치기 규칙으로, 입력칸 대신 글자·O/X 모양을 넣는다.
+// 구분·사용장비·항목 이름은 코드에 적힌 고정 문구(<br> 포함)라 그대로 넣는다.
+function operationPdfRowHtml(r) {
+  const cells = [];
+  if (r.isFirstOfDivision) {
+    cells.push(`<td class="op-pdf-l" rowspan="${r.divisionRowSpan}">${r.divisionName}</td>`);
+    cells.push(`<td class="op-pdf-l" rowspan="${r.divisionRowSpan}">${r.equipmentLabel}</td>`);
+  }
+  if (r.itemRowIndex === 0) {
+    cells.push(`<td class="op-pdf-l" rowspan="${r.itemRowCount}">${r.itemLabel}</td>`);
+    const refValue = getReferenceText(r.refKey) ?? r.defaultRef ?? "";
+    const ref = `<td class="op-pdf-ref"%SPAN%>${escapeHtml(refValue || "-").replace(/\n/g, "<br />")}</td>`;
+    if (r.itemRowCount === 1 && !r.subLabel) {
+      cells.push(ref.replace("%SPAN%", ` colspan="2"`)); // 압축기·입출구 구분이 없는 항목은 화면처럼 칸을 합친다
+    } else {
+      cells.push(`<td class="op-pdf-sub">${escapeHtml(r.subLabel || "-")}</td>`);
+      cells.push(ref.replace("%SPAN%", ` rowspan="${r.itemRowCount}"`));
+    }
+  } else {
+    cells.push(`<td class="op-pdf-sub">${escapeHtml(r.subLabel || "-")}</td>`);
+  }
+  return `<tr>${cells.join("")}${TIME_SLOTS.map((slot) => operationPdfValueCell(r, slot)).join("")}</tr>`;
+}
+
+function exportOperationLogToPdf() {
+  if (modalState.id === null || !isFullyApproved()) return;
+
+  // 결재란은 화면과 같은 공통 모듈로 그리고 조작 버튼(취소)만 걷어낸다
+  const approvalEl = document.createElement("div");
+  approvalEl.className = "approval-bar";
+  renderApprovalBar(approvalEl, modalState, { allowApprove: false });
+  approvalEl.querySelectorAll("button").forEach((btn) => btn.remove());
+
+  // 계통별로 묶어 <tbody> 하나씩
+  const groups = [];
+  buildReportRows(state.compressors).forEach((r) => {
+    if (r.isFirstOfDivision) groups.push([]);
+    groups[groups.length - 1].push(r);
+  });
+  const bodiesHtml = groups
+    .map((rows) => `<tbody${rows.length <= OP_PDF_KEEP_MAX_ROWS ? ` class="op-pdf-keep"` : ""}>${rows.map(operationPdfRowHtml).join("")}</tbody>`)
+    .join("");
+
   const dateObj = new Date(modalState.date);
-  await withGlobalBusy(
-    () =>
-      exportLogToExcel({
-        fileName: excelFileName(["운전일지", modalState.region, modalState.equipmentName, modalState.date]),
-        sheets: [
-          {
-            name: modalState.date,
-            title: "운전일지",
-            info: [
-              ["지역", modalState.region],
-              ["시설동", modalState.buildingName],
-              ["장비명", modalState.equipmentName],
-              ["날짜", `${formatDateKo(modalState.date)} (${DAY_LABELS[dateObj.getDay()]})`],
-            ],
-            approvals: approvalsForExcel(modalState),
-            table: document.querySelector(".op-table"),
-          },
-        ],
-      }),
-    { label: "엑셀 파일 만드는 중..." }
-  );
+  printPdfDocument({
+    fileName: pdfSafeFileName(["운전일지", modalState.region, modalState.equipmentName, modalState.date]),
+    html: `
+      <div class="pdf-doc">
+        <div class="pdf-head">
+          <div>
+            <h1 class="pdf-title"><small>OPERATION</small>운전일지</h1>
+            <p class="pdf-meta">
+              ${escapeHtml(modalState.region)} · ${escapeHtml(modalState.buildingName)} · <b>${escapeHtml(modalState.equipmentName)}</b><br />
+              ${formatDateKo(modalState.date)} (${DAY_LABELS[dateObj.getDay()]})
+            </p>
+          </div>
+          <div class="pdf-head-right">
+            <div class="pdf-status">운영 상태 : ${escapeHtml(modalState.operatingStatus || "-")}</div>
+            ${approvalEl.outerHTML}
+          </div>
+        </div>
+        <table class="pdf-table op-pdf-table">
+          <colgroup>
+            <col style="width: 50px" />
+            <col style="width: 70px" />
+            <col style="width: 92px" />
+            <col style="width: 58px" />
+            <col style="width: 138px" />
+            ${TIME_SLOT_LABELS.map(() => `<col style="width: 68px" />`).join("")}
+          </colgroup>
+          <thead>
+            <tr>
+              <th>구분</th>
+              <th>사용장비</th>
+              <th colspan="2">점검항목</th>
+              <th>실측 기준</th>
+              ${TIME_SLOT_LABELS.map((l) => `<th>${l}</th>`).join("")}
+            </tr>
+          </thead>
+          ${bodiesHtml}
+          <tbody class="op-pdf-keep">
+            <tr><td class="op-pdf-l">비고</td><td class="op-pdf-note" colspan="8">${OPERATION_NOTE_TEXT}</td></tr>
+          </tbody>
+        </table>
+        <div class="op-pdf-printed">${escapeHtml(pdfPrintedByText())}</div>
+      </div>
+    `,
+  });
 }
 
 function closeOperationModal() {
@@ -560,7 +660,10 @@ function renderModalBody() {
         <span class="op-meta-chip">${escapeHtml(modalState.buildingName)}</span>
         <span class="op-meta-chip op-meta-chip-primary">${escapeHtml(modalState.equipmentName)}</span>
       </div>
-      <span class="op-report-date-badge">${formatDateKo(modalState.date)} (${DAY_LABELS[dateObj.getDay()]})</span>
+      <div class="op-report-right">
+        <span class="doc-operating-status">운영 상태 : ${escapeHtml(modalState.operatingStatus || "-")}</span>
+        <span class="op-report-date-badge">${formatDateKo(modalState.date)} (${DAY_LABELS[dateObj.getDay()]})</span>
+      </div>
     </div>
 
     ${locked ? `<div class="op-approved-note">${fullyApproved ? "결재가 완료된" : "결재가 진행된"} 문서라 읽기 전용입니다. 다시 수정하려면 시스템관리자의 결재 리셋이 필요합니다.</div>` : ""}
@@ -598,7 +701,7 @@ function renderModalBody() {
           : ""}
       </div>
       <div class="footer-right">
-        <button type="button" class="btn btn-secondary" id="exportExcelBtn">엑셀 저장</button>
+        ${modalState.id !== null ? `<button type="button" class="btn btn-secondary" id="exportPdfBtn">PDF 저장</button>` : ""}
         <button type="button" class="btn btn-secondary" id="modalCancelBtn">닫기</button>
         ${locked ? "" : `<button type="button" class="btn btn-primary" id="saveOperationBtn">저장</button>`}
       </div>
@@ -610,7 +713,10 @@ function renderModalBody() {
   renderOperationApprovalBar();
   renderReportTable(buildReportRows(state.compressors));
 
-  document.getElementById("exportExcelBtn").addEventListener("click", exportOperationLogToExcel);
+  // 저장 전 문서(id 없음)는 PDF 대상이 아니라 버튼이 없다
+  const pdfBtn = document.getElementById("exportPdfBtn");
+  if (pdfBtn) pdfBtn.addEventListener("click", exportOperationLogToPdf);
+  renderOperationPdfButton();
   document.getElementById("modalCancelBtn").addEventListener("click", closeOperationModal);
   const saveBtn = document.getElementById("saveOperationBtn");
   if (saveBtn) saveBtn.addEventListener("click", () => saveOperationLog());
@@ -866,7 +972,7 @@ function wireTableEvents(tbody) {
       const current = getItemSlotRaw(itemKey, null, slot);
       const next = cycleOxValue(current);
       setItemSlotRaw(itemKey, null, slot, next);
-      btn.textContent = oxToggleSymbol(next);
+      btn.innerHTML = oxToggleSymbol(next);
       btn.className = `ox-toggle-btn ${oxCellClass(next)}`;
     });
   });

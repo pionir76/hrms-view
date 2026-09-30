@@ -27,6 +27,11 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14" /></svg>맵<em>준비 중</em>
           </button>
         </div>
+        <!-- 시스템 정보·서버 상태 패널 열기/닫기 — 닫혀 있어도 점 색으로 서버 상태를 알 수 있게 한다 -->
+        <button type="button" class="db-sys-toggle" id="dbSysToggle" aria-expanded="false" aria-controls="dbColRight">
+          <span class="db-sys-dot none" id="dbSysDot"></span>시스템 상태
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
+        </button>
       </div>
 
       <div class="db-body">
@@ -71,8 +76,8 @@
           </div>
         </div>
 
-        <!-- 우측: 시스템 정보 + 서버 상태 -->
-        <div class="db-col-right">
+        <!-- 우측: 시스템 정보 + 서버 상태 — 평소엔 접혀 있고 "시스템 상태" 버튼으로 오른쪽에서 밀려 나온다 -->
+        <div class="db-col-right" id="dbColRight" aria-hidden="true">
           <div class="db-card db-sys">
             <div class="db-card-title">시스템 정보<em id="sysCheckedAt">30초 갱신</em></div>
             <div class="db-storage-title">저장소 사용량</div>
@@ -167,6 +172,7 @@
   <script src="../../common/js/config.js"></script>
   <script src="../../common/js/auth.js"></script>
   <script src="../../common/js/api.js"></script>
+  <script src="../../common/js/approval-inbox.js"></script>
   <script src="../../common/js/layout.js"></script>
   <script src="../../common/js/channels.js"></script>
   <script src="../../common/js/ui.js"></script>

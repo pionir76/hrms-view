@@ -67,12 +67,11 @@
             </div>
           </div>
 
-          <div class="panel detail-card detail-emergency">
-            <h2 class="section-title detail-card-title">비상정지</h2>
-            <p class="detail-emergency-note">
-              대상 압축기와 현재 운전 상태를 확인한 후 실행하세요. (비상정지 API가 아직 준비되지 않아, 지금은 확인 절차까지만 동작합니다.)
-            </p>
-            <button type="button" class="btn btn-danger detail-emergency-btn" id="emergencyStopBtn">비상정지 실행</button>
+          <!-- 안전관리책임자·총괄자·시스템관리자에게만 보인다(equipment-detail.js가 hidden을 푼다) -->
+          <div class="panel detail-card detail-emergency" id="emergencyCard" hidden>
+            <h2 class="section-title detail-card-title" id="emergencyTitle">비상정지</h2>
+            <p class="detail-emergency-note" id="emergencyNote">장비 전체(소속 압축기 모두)가 즉시 정지됩니다.</p>
+            <button type="button" class="btn btn-danger detail-emergency-btn" id="emergencyStopBtn">비상정지</button>
           </div>
         </aside>
 
@@ -128,13 +127,18 @@
 
   <div class="modal-overlay" id="emergencyModal" hidden>
     <div class="modal-box">
-      <div class="modal-header">비상정지 재확인</div>
+      <div class="modal-header emg-modal-head">
+        <svg viewBox="0 0 24 24" id="emergencyModalIcon"><path d="M12 3 2 20h20L12 3z" /><path d="M12 10v4M12 17h.01" /></svg>
+        <span id="emergencyModalTitle">비상정지 재확인</span>
+      </div>
       <div class="modal-body">
-        <div class="field" style="margin-bottom: 12px">
-          <label for="emergencyCompressorSelect">대상 압축기</label>
-          <select id="emergencyCompressorSelect"></select>
+        <p class="emg-modal-text" id="emergencyConfirmText"></p>
+        <!-- 비밀번호는 정지할 때만 받는다(해제는 묻지 않음). 서버가 75번에서 검증한다 -->
+        <div class="field emg-pw-field" id="emergencyPwField">
+          <label for="emergencyPassword">비밀번호 확인</label>
+          <input type="password" id="emergencyPassword" placeholder="로그인 비밀번호 입력" autocomplete="current-password" />
+          <div class="emg-pw-hint" id="emergencyPwHint">입력 후 Enter 키로도 전송됩니다.</div>
         </div>
-        <p id="emergencyConfirmText" style="margin: 0"></p>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" id="emergencyCancelBtn">취소</button>
@@ -146,6 +150,7 @@
   <script src="../../common/js/config.js"></script>
   <script src="../../common/js/auth.js"></script>
   <script src="../../common/js/api.js"></script>
+  <script src="../../common/js/approval-inbox.js"></script>
   <script src="../../common/js/layout.js"></script>
   <script src="../../common/js/channels.js"></script>
   <script src="../../common/js/ui.js"></script>

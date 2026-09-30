@@ -124,21 +124,42 @@ function renderOrgChart() {
   });
 }
 
+// 차기교육일까지 남은 날 — 30일 이내면 주황, 지나면 빨강(오늘은 D-0)
+function trainingDdayHtml(dateStr) {
+  if (!dateStr) return "";
+  const days = Math.round((new Date(dateStr.slice(0, 10)) - new Date(todayDateString())) / 86400000);
+  if (Number.isNaN(days)) return "";
+  const cls = days < 0 ? "over" : days <= 30 ? "soon" : "";
+  return `<span class="org-dday ${cls}">${days < 0 ? `D+${-days}` : `D-${days}`}</span>`;
+}
+
+// 인원 카드 — 머리(담당업무 색 면: 담당업무 · 이름 첫 글자 동그라미 + 이름/직위 · 소속팀) +
+// 본문(연락처·대직자·담당장비·차기교육일) + 세부정보 버튼. 사용자 결정 2026-09-29(시안 mokup/org_card_v1).
 function orgCardHtml(u, cls) {
   const hasReport = !!u.appointmentReportId;
+  const initial = String(u.fullName || "?").trim().charAt(0);
+  const nextTraining = u.nextTrainingDate ? u.nextTrainingDate.slice(0, 10) : "";
   return `
     <div class="org-card ${cls}">
       <div class="org-card-head">
-        <span class="org-role">${escapeHtml(u.role)}</span>
+        <div class="org-card-role">${escapeHtml(u.role)}</div>
+        <div class="org-card-who">
+          <span class="org-avatar" aria-hidden="true">${escapeHtml(initial)}</span>
+          <div>
+            <div class="org-name">${escapeHtml(u.fullName)}${u.position ? `<small>${escapeHtml(u.position)}</small>` : ""}</div>
+            <div class="org-dept">${escapeHtml(u.department || "소속팀 미지정")}</div>
+          </div>
+        </div>
         <button type="button" class="org-report-btn" ${hasReport ? `data-report="${u.id}"` : "disabled"}
           title="${hasReport ? "선해임 신고서 받기" : "선해임 신고서 미등록"}" aria-label="선해임 신고서 받기">${ICON_DOWNLOAD}</button>
       </div>
-      <div class="org-dept">${escapeHtml(u.department || "소속팀 미지정")}</div>
-      <div class="org-name">${escapeHtml(u.fullName)}${u.position ? `<small>${escapeHtml(u.position)}</small>` : ""}</div>
-      <div class="org-phones">
-        <div><span>연락처1</span>${escapeHtml(u.phone1 || "-")}</div>
-        <div><span>연락처2</span>${escapeHtml(u.phone2 || "-")}</div>
-      </div>
+      <dl class="org-card-info">
+        <dt>연락처1</dt><dd>${escapeHtml(u.phone1 || "-")}</dd>
+        <dt>연락처2</dt><dd>${escapeHtml(u.phone2 || "-")}</dd>
+        <dt>대직자</dt><dd>${escapeHtml(u.backupPersonName || "-")}</dd>
+        <dt>담당장비</dt><dd>${(u.equipmentIds || []).length}대</dd>
+        <dt>차기교육</dt><dd>${nextTraining ? `${escapeHtml(nextTraining.replace(/-/g, "."))} ${trainingDdayHtml(nextTraining)}` : "-"}</dd>
+      </dl>
       <button type="button" class="org-detail-btn" data-detail="${u.id}">세부정보</button>
     </div>
   `;
@@ -355,6 +376,7 @@ function initManageModal() {
   });
 
   document.getElementById("omEquipSearch").addEventListener("input", renderEquipmentPicker);
+  document.getElementById("omEquipAll").addEventListener("click", toggleAllEquipments);
 }
 
 function bindSegment(id, onChange) {
@@ -625,6 +647,10 @@ function renderEquipmentPicker() {
     })
     .filter((g) => g.visibleItems.length > 0);
 
+  // 전체 선택 대상 — 검색 중이면 검색 결과에 보이는 장비만
+  om.visibleEquipIds = visibleGroups.flatMap((g) => g.visibleItems.map((e) => e.id));
+  renderEquipAllToggle(!!keyword);
+
   if (visibleGroups.length === 0) {
     el.innerHTML = `<div class="om-equip-empty">${keyword ? "검색 결과가 없습니다." : "등록된 장비가 없습니다."}</div>`;
     return;
@@ -685,6 +711,28 @@ function renderEquipmentPicker() {
       });
     });
   });
+}
+
+// 전체 선택 체크 — 대상(검색 결과 또는 전체) 중 몇 대가 선택됐는지로 빈칸/일부/전부를 그린다
+function renderEquipAllToggle(searching) {
+  const ids = om.visibleEquipIds || [];
+  const selected = ids.filter((id) => om.equipmentIds.has(id)).length;
+  const cbState = selected === 0 ? "" : selected === ids.length ? "on" : "part";
+  document.getElementById("omEquipAllCb").className = `om-cb ${cbState}`;
+  document.getElementById("omEquipAllLabel").textContent = searching ? "검색 결과 전체" : "전체 선택";
+  const btn = document.getElementById("omEquipAll");
+  btn.disabled = ids.length === 0;
+  btn.setAttribute("aria-pressed", String(ids.length > 0 && selected === ids.length));
+}
+
+// 시설동 체크와 같은 규칙 — 대상이 전부 선택돼 있으면 전부 해제, 아니면(빈칸·일부) 전부 선택.
+// 저장을 눌러야 반영되므로 확인창은 두지 않는다.
+function toggleAllEquipments() {
+  const ids = om.visibleEquipIds || [];
+  if (ids.length === 0) return;
+  const allOn = ids.every((id) => om.equipmentIds.has(id));
+  ids.forEach((id) => (allOn ? om.equipmentIds.delete(id) : om.equipmentIds.add(id)));
+  renderEquipmentPicker();
 }
 
 // ----- 저장 -----

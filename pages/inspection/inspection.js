@@ -23,6 +23,7 @@ const modalState = {
   level2: null,
   level3: null,
   results: [], // [{ itemNo, category, content, sun..sat, memo }]
+  operatingStatus: "", // 장비 운영 상태 — 문서를 연 시점 값(우측 상단·PDF에 글자로 표시)
 };
 
 // ---------- 초기화 ----------
@@ -31,11 +32,18 @@ async function initInspectionPage() {
   populateYearMonthSelects();
 
   try {
-    state.equipments = await apiFetch("/api/equipments");
+    // 담당 장비만 — 저장 권한이 담당 기준이라 목록도 같은 기준으로 맞춘다(백엔드 2026-09-28).
+    // 시스템관리자는 mine=true여도 서버가 전체를 준다.
+    state.equipments = await apiFetch("/api/equipments?mine=true");
   } catch (err) {
     document.getElementById("calendarArea").innerHTML =
       `<div class="empty-state">장비 목록을 불러오지 못했습니다. (${escapeHtml(err.message)})</div>`;
     return;
+  }
+
+  // 담당 장비가 하나도 없으면 선택 자체가 불가능하다 — 화면이 고장 난 것으로 오해하지 않게 알려준다
+  if (state.equipments.length === 0) {
+    renderCalendarPlaceholder("담당 장비가 없습니다. 시스템관리자에게 담당 장비 등록을 요청하세요.");
   }
 
   populateRegionSelect();
@@ -95,6 +103,7 @@ function onRegionChange() {
 
   resetSelect(equipmentSelect, "선택");
   state.equipmentId = null;
+  renderEquipmentStatus(null);
   renderSelectionSummary();
 
   if (!region) {
@@ -118,6 +127,7 @@ function onBuildingChange() {
   const equipmentSelect = document.getElementById("equipmentSelect");
 
   state.equipmentId = null;
+  renderEquipmentStatus(null);
   renderSelectionSummary();
 
   if (!buildingName) {
@@ -142,6 +152,7 @@ function onEquipmentChange() {
   if (!equipmentId) {
     state.equipmentId = null;
     renderSelectionSummary();
+    renderEquipmentStatus(null);
     renderCalendarPlaceholder("좌측에서 설비를 선택하세요.");
     return;
   }
@@ -150,6 +161,7 @@ function onEquipmentChange() {
   state.equipmentId = equipmentId;
   state.equipmentName = equipment ? equipment.name : "";
   renderSelectionSummary();
+  refreshEquipmentStatus(equipmentId, equipment ? equipment.status : null);
 
   document.getElementById("prevMonthBtn").disabled = false;
   document.getElementById("nextMonthBtn").disabled = false;
@@ -179,6 +191,34 @@ function renderSelectionSummary() {
   if (state.equipmentId && state.equipmentName) parts.push(state.equipmentName);
 
   el.innerHTML = parts.map((p) => `<span class="selection-part">${escapeHtml(p)}</span>`).join(`<span class="selection-sep">›</span>`);
+}
+
+// ---------- 우측 상단: 선택한 장비의 운영 상태 ----------
+//
+// 관리자가 정하는 운영 상태(status)만 보여준다(사용자 결정 2026-09-29 — 운전·통신·경보는 표시하지
+// 않고, 눌러서 다른 화면으로 가는 동작도 없다). 색은 장비 관리 화면과 같다.
+
+function equipmentStatusBadgeHtml(status) {
+  const cls = status === "운영" ? "badge-normal" : ["수리중", "점검중", "철거예정"].includes(status) ? "badge-warning" : "badge-muted";
+  return `<span class="badge ${cls}">${escapeHtml(status || "-")}</span>`;
+}
+
+function renderEquipmentStatus(status) {
+  const box = document.getElementById("equipmentStatusBox");
+  box.hidden = !state.equipmentId;
+  if (state.equipmentId) document.getElementById("equipmentStatusBadge").innerHTML = equipmentStatusBadgeHtml(status);
+}
+
+// 목록 값(화면을 연 시점)을 바로 보여주고, 장비 1건을 다시 읽어 지금 값으로 맞춘다.
+// 기다리는 사이 다른 장비를 골랐으면 늦게 온 응답은 버린다.
+async function refreshEquipmentStatus(equipmentId, listStatus) {
+  renderEquipmentStatus(listStatus);
+  try {
+    const equipment = await apiFetch(`/api/equipments/${equipmentId}`);
+    if (String(state.equipmentId) === String(equipmentId)) renderEquipmentStatus(equipment.status);
+  } catch (err) {
+    // 목록 값을 그대로 둔다
+  }
 }
 
 function renderCalendarTitleOnly() {
@@ -374,8 +414,12 @@ async function openInspectionModal(weekStart) {
   modalBody.innerHTML = `<div class="empty-state">불러오는 중...</div>`;
 
   try {
-    const log = await apiFetch(`/api/inspection-logs?equipmentId=${state.equipmentId}&weekStart=${weekStart}`);
     const equipment = state.equipments.find((e) => String(e.id) === String(state.equipmentId));
+    const [log, operatingStatus] = await Promise.all([
+      apiFetch(`/api/inspection-logs?equipmentId=${state.equipmentId}&weekStart=${weekStart}`),
+      fetchEquipmentOperatingStatus(state.equipmentId, equipment ? equipment.status : ""),
+    ]);
+    modalState.operatingStatus = operatingStatus;
     modalState.equipmentId = state.equipmentId;
     modalState.equipmentName = state.equipmentName;
     modalState.region = equipment ? equipment.region : "";
@@ -396,34 +440,94 @@ async function openInspectionModal(weekStart) {
   }
 }
 
-// 화면 표를 그대로 엑셀로 내려받는다(common/js/excel-export.js).
-// 점검자 의견과 표 아래 안내문도 함께 넣는다. 한 달치가 필요해지면 sheets에 주차별 표를
-// 여러 개 넣으면 된다 — 지금은 열려 있는 1주치 1건만 넣는다.
-async function exportInspectionLogToExcel() {
+// ---------- PDF 저장 (common/js/pdf-export.js) ----------
+//
+// 엑셀 저장을 대체한다(사용자 결정 2026-09-29, 교육훈련에서 먼저 시험). 결재가 끝난 문서만
+// 저장할 수 있고(교육훈련과 같은 규칙), 그 문서는 잠겨 있으므로 저장된 값(modalState)으로 만든다.
+// 요일 7칸 때문에 A4 가로로 찍는다(.pdf-doc.is-landscape).
+
+function renderInspectionPdfButton() {
+  const btn = document.getElementById("exportPdfBtn");
+  if (!btn) return;
+  const complete = isApprovalComplete(modalState);
+  btn.disabled = !complete;
+  btn.title = complete ? "" : "결재가 완료된 문서만 PDF로 저장할 수 있습니다";
+}
+
+function exportInspectionLogToPdf() {
+  if (modalState.id === null || !isApprovalComplete(modalState)) return;
+
+  // 결재란은 화면과 같은 공통 모듈로 그리고 조작 버튼(취소)만 걷어낸다
+  const approvalEl = document.createElement("div");
+  approvalEl.className = "approval-bar";
+  renderApprovalBar(approvalEl, modalState, { allowApprove: false });
+  approvalEl.querySelectorAll("button").forEach((btn) => btn.remove());
+
   const period = `${formatDateKo(modalState.weekStart)} (일) ~ ${formatDateKo(weekEndDateStr(modalState.weekStart))} (토)`;
-  const opinion = document.getElementById("opinionTextarea")?.value.trim() ?? "";
-  await withGlobalBusy(
-    () =>
-      exportLogToExcel({
-        fileName: excelFileName(["점검일지", modalState.region, modalState.equipmentName, modalState.weekStart]),
-        sheets: [
-          {
-            name: modalState.weekStart,
-            title: "점검일지",
-            info: [
-              ["지역", modalState.region],
-              ["시설동", modalState.buildingName],
-              ["장비명", modalState.equipmentName],
-              ["점검기간", period],
-            ],
-            approvals: approvalsForExcel(modalState),
-            table: document.querySelector(".inspection-table"),
-            notes: [`점검자 의견: ${opinion || "-"}`, document.querySelector(".opinion-note")?.textContent.replace(/\s+/g, " ").trim() ?? ""],
-          },
-        ],
-      }),
-    { label: "엑셀 파일 만드는 중..." }
-  );
+
+  // 화면 표와 같은 묶음(rowspan)·순서로, 입력칸과 토글 버튼 대신 글자와 O/X 모양으로 채운다
+  const rowsHtml = [];
+  groupResultsByItem(modalState.results).forEach((group) => {
+    group.rows.forEach((r, i) => {
+      const leading =
+        i === 0
+          ? `<td class="pdf-center" rowspan="${group.rows.length}">${escapeHtml(group.key)}</td>
+             <td class="pdf-middle" rowspan="${group.rows.length}">${escapeHtml(r.category)}</td>`
+          : "";
+      const days = DAY_KEYS.map(
+        (day) => `<td class="pdf-center"><span class="ox-toggle-btn ${oxCellClass(r[day])}">${oxToggleSymbol(r[day])}</span></td>`
+      ).join("");
+      rowsHtml.push(`<tr>${leading}<td class="pdf-middle">${escapeHtml(r.content)}</td>${days}<td class="pdf-middle">${escapeHtml(r.memo || "")}</td></tr>`);
+    });
+  });
+
+  printPdfDocument({
+    fileName: pdfSafeFileName(["점검일지", modalState.region, modalState.equipmentName, modalState.weekStart]),
+    html: `
+      <div class="pdf-doc is-landscape">
+        <div class="pdf-head">
+          <div>
+            <h1 class="pdf-title"><small>INSPECTION</small>점검일지</h1>
+            <p class="pdf-meta">
+              ${escapeHtml(modalState.region)} · ${escapeHtml(modalState.buildingName)} · <b>${escapeHtml(modalState.equipmentName)}</b><br />
+              점검기간 ${escapeHtml(period)}
+            </p>
+          </div>
+          <div class="pdf-head-right">
+            <div class="pdf-status">운영 상태 : ${escapeHtml(modalState.operatingStatus || "-")}</div>
+            ${approvalEl.outerHTML}
+          </div>
+        </div>
+        <table class="pdf-table">
+          <colgroup>
+            <col style="width: 44px" />
+            <col style="width: 150px" />
+            <col />
+            ${DAY_KEYS.map(() => `<col style="width: 40px" />`).join("")}
+            <col style="width: 150px" />
+          </colgroup>
+          <thead>
+            <tr>
+              <th>번호</th>
+              <th>점검항목</th>
+              <th>점검내용</th>
+              ${DAY_LABELS.map((l) => `<th>${l}</th>`).join("")}
+              <th>비고</th>
+            </tr>
+          </thead>
+          <tbody>${rowsHtml.join("")}</tbody>
+        </table>
+        <div class="pdf-box">
+          <div class="pdf-box-title">점검자 의견</div>
+          <div class="pdf-box-body">${escapeHtml(modalState.opinion || "")}</div>
+          <div class="pdf-note-row">
+            <p class="pdf-note">${document.querySelector(".opinion-note")?.innerHTML.trim() ?? ""}</p>
+            <span class="pdf-printed">${escapeHtml(pdfPrintedByText())}</span>
+          </div>
+        </div>
+      </div>
+    `,
+  });
 }
 
 function closeInspectionModal() {
@@ -443,9 +547,14 @@ function renderModalBody() {
   const session = getSession();
 
   const html = `
-    <p class="inspection-modal-location">${escapeHtml(modalState.region)} · ${escapeHtml(modalState.buildingName)}</p>
-    <h3 class="inspection-modal-title">${escapeHtml(modalState.equipmentName)}</h3>
-    <p class="inspection-modal-subtitle">${formatDateKo(modalState.weekStart)} (일) ~ ${formatDateKo(weekEndDateStr(modalState.weekStart))} (토)</p>
+    <div class="inspection-modal-head">
+      <div>
+        <p class="inspection-modal-location">${escapeHtml(modalState.region)} · ${escapeHtml(modalState.buildingName)}</p>
+        <h3 class="inspection-modal-title">${escapeHtml(modalState.equipmentName)}</h3>
+        <p class="inspection-modal-subtitle">${formatDateKo(modalState.weekStart)} (일) ~ ${formatDateKo(weekEndDateStr(modalState.weekStart))} (토)</p>
+      </div>
+      <span class="doc-operating-status">운영 상태 : ${escapeHtml(modalState.operatingStatus || "-")}</span>
+    </div>
 
     <div class="inspection-error" id="inspectionError" hidden></div>
     ${locked ? `<div class="inspection-locked-note">결재가 진행되어 이 점검표는 읽기 전용입니다. 다시 수정하려면 시스템관리자의 결재 리셋이 필요합니다.</div>` : ""}
@@ -489,7 +598,7 @@ function renderModalBody() {
         ${session && session.role === "시스템관리자" && modalState.id !== null && isApprovalStarted(modalState) ? `<button type="button" class="btn btn-secondary" id="resetApprovalBtn">결재 전체 리셋</button>` : ""}
       </div>
       <div class="footer-right">
-        <button type="button" class="btn btn-secondary" id="exportExcelBtn">엑셀 저장</button>
+        ${modalState.id !== null ? `<button type="button" class="btn btn-secondary" id="exportPdfBtn">PDF 저장</button>` : ""}
         <button type="button" class="btn btn-secondary" id="modalCancelBtn">닫기</button>
         ${locked ? "" : `<button type="button" class="btn btn-primary" id="saveInspectionBtn">저장</button>`}
       </div>
@@ -501,7 +610,10 @@ function renderModalBody() {
   renderInspectionApprovalBar();
   renderInspectionTable();
 
-  document.getElementById("exportExcelBtn").addEventListener("click", exportInspectionLogToExcel);
+  // 저장 전 문서(id 없음)는 PDF 대상이 아니라 버튼이 없다
+  const pdfBtn = document.getElementById("exportPdfBtn");
+  if (pdfBtn) pdfBtn.addEventListener("click", exportInspectionLogToPdf);
+  renderInspectionPdfButton();
   document.getElementById("modalCancelBtn").addEventListener("click", closeInspectionModal);
 
   const saveBtn = document.getElementById("saveInspectionBtn");
@@ -531,14 +643,32 @@ function renderInspectionApprovalBar() {
   });
 }
 
+// 결재·취소·리셋 응답은 결재 상태만 믿고, 점검 내용은 조회 API(12번)로 다시 받는다.
+//
+// 결재 응답(14번)의 results를 그대로 쓰면, 저장해 둔 체크 값이 화면에서 전부 빈칸으로 바뀌는
+// 현상이 있었다(2026-09-29 사용자 제보 — 결재 응답에 값이 비어 오는 것으로 보임). 결재는 점검
+// 내용을 바꾸지 않으므로 내용은 원래 기준인 조회 API에서 받는다. 조회가 실패하면 결재 상태만
+// 바꾸고 지금 화면의 내용은 그대로 둔다.
+async function applyApprovalResponse(updated) {
+  modalState.level1 = updated.level1;
+  modalState.level2 = updated.level2;
+  modalState.level3 = updated.level3;
+  try {
+    const fresh = await apiFetch(`/api/inspection-logs?equipmentId=${modalState.equipmentId}&weekStart=${modalState.weekStart}`);
+    applyLogResponse(fresh);
+  } catch (err) {
+    // 다음에 창을 다시 열면 맞춰진다
+  }
+  renderModalBody();
+  inspectionDirty.capture();
+  loadCalendar();
+}
+
 async function approveLevel() {
   if (!(await confirmBeforeApprove(inspectionDirty, () => saveInspectionLog({ askConfirm: false, closeAfter: false })))) return;
   try {
     const updated = await apiFetch(`/api/inspection-logs/${modalState.id}/approve`, { method: "POST" });
-    applyLogResponse(updated);
-    renderModalBody();
-    inspectionDirty.capture();
-    loadCalendar();
+    await applyApprovalResponse(updated);
   } catch (err) {
     showModalError(err);
   }
@@ -548,10 +678,7 @@ async function cancelApproval() {
   if (!window.confirm("결재를 취소하시겠습니까?")) return;
   try {
     const updated = await apiFetch(`/api/inspection-logs/${modalState.id}/approve/cancel`, { method: "POST" });
-    applyLogResponse(updated);
-    renderModalBody();
-    inspectionDirty.capture();
-    loadCalendar();
+    await applyApprovalResponse(updated);
   } catch (err) {
     showModalError(err);
   }
@@ -561,10 +688,7 @@ async function resetApprovals() {
   if (!window.confirm("이 문서의 결재를 전부 리셋하시겠습니까?")) return;
   try {
     const updated = await apiFetch(`/api/inspection-logs/${modalState.id}/approvals/reset`, { method: "POST" });
-    applyLogResponse(updated);
-    renderModalBody();
-    inspectionDirty.capture();
-    loadCalendar();
+    await applyApprovalResponse(updated);
   } catch (err) {
     showModalError(err);
   }
@@ -641,7 +765,7 @@ function renderInspectionTable() {
         const day = btn.dataset.day;
         const next = cycleOxValue(modalState.results[idx][day]);
         modalState.results[idx][day] = next;
-        btn.textContent = oxToggleSymbol(next);
+        btn.innerHTML = oxToggleSymbol(next);
         btn.className = `ox-toggle-btn ${oxCellClass(next)}`;
       });
     });

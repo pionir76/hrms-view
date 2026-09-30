@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<title>조직도 카드 시안</title>
+<link rel="stylesheet" href="../common/css/common.css" />
+<link rel="stylesheet" href="../pages/org/org.css" />
+<style>
+  body { background: var(--color-bg, #f4f6fb); padding: 28px 32px; width: 1400px; }
+  .sec { margin-bottom: 44px; }
+  .sec-title { margin: 0 0 4px; font-size: 16px; font-weight: 800; color: #002c5f; }
+  .sec-desc { margin: 0 0 18px; font-size: 12.5px; color: var(--color-text-muted); }
+  .org-chart { padding: 0; }
+  .org-tier + .org-tier { margin-top: 36px; }
+  .org-tier + .org-tier::before { top: -36px; height: 36px; }
+  .org-tier + .org-tier::after { top: -22px; }
+
+  /* 공통 소품 */
+  .ic { width: 14px; height: 14px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .avatar { flex-shrink: 0; display: grid; place-items: center; border-radius: 50%; background: var(--role-grad); color: #fff; font-weight: 800; }
+  .dday { padding: 1px 7px; border-radius: 99px; font-size: 10.5px; font-weight: 800; background: #eafaf3; color: #0f9467; }
+  .dday.soon { background: #fff6ed; color: #b54708; }
+  .dday.over { background: #ffe9e6; color: #c4261d; }
+
+  /* ===== A. 프로필형 ===== */
+  .ca { width: 250px; padding: 18px 16px 14px; border: 1px solid rgba(228,232,240,.9); border-radius: var(--radius-lg); background: #fff; box-shadow: var(--shadow-card); text-align: center; position: relative; }
+  .ca .role-tag { position: absolute; top: 12px; left: 12px; padding: 2px 8px; border-radius: 99px; background: var(--role-soft); color: var(--role-color); font-size: 11px; font-weight: 800; }
+  .ca .rep { position: absolute; top: 10px; right: 10px; }
+  .ca .avatar { width: 58px; height: 58px; margin: 8px auto 10px; font-size: 22px; box-shadow: 0 6px 16px -6px var(--role-color); }
+  .ca .nm { font-size: 18px; font-weight: 800; letter-spacing: -.02em; }
+  .ca .nm small { margin-left: 5px; font-size: 12px; font-weight: 600; color: var(--color-text-muted); }
+  .ca .dp { margin-top: 2px; font-size: 12px; color: var(--color-text-muted); }
+  .ca .ph { margin-top: 12px; display: grid; gap: 4px; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+  .ca .ph div { display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .ca .ph .ic { color: var(--role-color); }
+  .ca .chips { margin-top: 12px; display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; }
+  .ca .chip { padding: 3px 9px; border-radius: 99px; background: #f1f3f7; font-size: 11px; font-weight: 700; color: var(--color-text-sub); }
+  .ca .foot { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--color-border-soft); }
+  .ca .foot button { width: 100%; height: 32px; border: none; border-radius: 9px; background: var(--role-soft); color: var(--role-color); font: inherit; font-size: 12.5px; font-weight: 800; }
+
+  /* ===== B. 가로 컴팩트형 ===== */
+  .cb { width: 370px; display: flex; align-items: center; gap: 12px; padding: 12px 14px 12px 16px; border: 1px solid rgba(228,232,240,.9); border-radius: 14px; background: #fff; box-shadow: var(--shadow-card); position: relative; overflow: hidden; cursor: pointer; }
+  .cb::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--role-grad); }
+  .cb .avatar { width: 42px; height: 42px; font-size: 16px; }
+  .cb .body { flex: 1; min-width: 0; }
+  .cb .l1 { display: flex; align-items: baseline; gap: 6px; }
+  .cb .nm { font-size: 15.5px; font-weight: 800; }
+  .cb .ps { font-size: 11.5px; font-weight: 600; color: var(--color-text-muted); }
+  .cb .rl { margin-left: auto; font-size: 10.5px; font-weight: 800; color: var(--role-color); }
+  .cb .l2 { margin-top: 2px; font-size: 11.5px; color: var(--color-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cb .l3 { margin-top: 5px; display: flex; gap: 10px; white-space: nowrap; font-size: 12px; font-variant-numeric: tabular-nums; color: var(--color-text-sub); }
+  .cb .l3 span { display: inline-flex; align-items: center; gap: 4px; }
+  .cb .l3 .ic { width: 12px; height: 12px; color: var(--color-text-faint); }
+  .cb .rep { align-self: flex-start; }
+  .cb .org-report-btn { width: 28px; height: 28px; }
+
+  /* ===== C. 정보 강조형 ===== */
+  .cc { width: 272px; border: 1px solid rgba(228,232,240,.9); border-radius: var(--radius-lg); background: #fff; box-shadow: var(--shadow-card); overflow: hidden; }
+  .cc .hd { position: relative; padding: 14px 16px 16px; background: var(--role-grad); color: #fff; }
+  .cc .hd .rl { font-size: 11.5px; font-weight: 700; opacity: .85; }
+  .cc .hd .nm { margin-top: 4px; font-size: 20px; font-weight: 800; letter-spacing: -.02em; }
+  .cc .hd .nm small { margin-left: 6px; font-size: 12px; font-weight: 600; opacity: .85; }
+  .cc .hd .dp { font-size: 11.5px; opacity: .85; }
+  .cc .hd .rep { position: absolute; top: 12px; right: 12px; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 9px; background: rgba(255,255,255,.2); color: #fff; }
+  .cc .hd .rep.off { opacity: .45; }
+  .cc .bd { padding: 12px 16px 4px; display: grid; grid-template-columns: 56px 1fr; row-gap: 7px; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+  .cc .bd dt { font-size: 11.5px; color: var(--color-text-muted); }
+  .cc .bd dd { margin: 0; display: flex; align-items: center; gap: 6px; }
+  .cc .ft { display: flex; gap: 6px; padding: 10px 16px 14px; }
+  .cc .ft button { flex: 1; height: 32px; border: 1px solid var(--color-border); border-radius: 9px; background: #fff; font: inherit; font-size: 12.5px; font-weight: 700; color: var(--color-text-sub); }
+</style>
+</head>
+<body>
+  <div class="sec">
+    <p class="sec-title">현재</p>
+    <p class="sec-desc">담당업무 배지 · 소속 · 이름/직위 · 연락처 2줄 · 세부정보 버튼 (+ 우상단 선해임 신고서 받기)</p>
+    <div class="org-chart" id="cur"></div>
+  </div>
+  <div class="sec">
+    <p class="sec-title">A. 프로필형</p>
+    <p class="sec-desc">이름 첫 글자 아바타(담당업무 색)로 사람이 먼저 보이게. 가운데 정렬 · 담당장비 수·대직자 칩 추가 · 세부정보 버튼을 담당업무 색으로</p>
+    <div class="org-chart" id="a"></div>
+  </div>
+  <div class="sec">
+    <p class="sec-title">B. 가로 컴팩트형</p>
+    <p class="sec-desc">한 줄에 더 많이 들어가는 가로 카드(안전관리원이 많을 때 유리). 카드 전체를 누르면 세부정보 · 연락처는 한 줄 · 우측에 신고서 받기</p>
+    <div class="org-chart" id="b"></div>
+  </div>
+  <div class="sec">
+    <p class="sec-title">C. 정보 강조형</p>
+    <p class="sec-desc">머리를 담당업무 색 면으로 · 본문에 연락처·대직자·담당장비·차기교육일(D-day, 30일 이내 주황 / 지나면 빨강) · 하단 버튼 2개</p>
+    <div class="org-chart" id="c"></div>
+  </div>
+
+<script src="../common/js/ui.js"></script>
+<script>
+  const P = (role, cls, name, pos, dept, p1, p2, backup, equip, next, report) => ({ role, cls, name, pos, dept, p1, p2, backup, equip, next, report });
+  const TIERS = [
+    [P("안전관리총괄자", "role-1", "김총괄", "부장", "설비안전팀", "010-1234-5678", "031-123-4567", "이책임", 158, "2027-03-10", true)],
+    [P("안전관리책임자", "role-2", "이책임", "차장", "설비안전팀", "010-2222-3333", null, "박책임", 158, "2026-10-20", true),
+     P("안전관리책임자", "role-2", "박책임", "과장", "시험설비팀", "010-4444-5555", "031-555-1212", "이책임", 72, "2027-01-05", false)],
+    [P("안전관리원", "role-3", "최안전", "대리", "설비안전팀", "010-6666-7777", null, "정안전", 24, "2026-09-12", true),
+     P("안전관리원", "role-3", "정안전", "사원", "시험설비팀", "010-8888-9999", null, "최안전", 18, "2027-04-01", true),
+     P("안전관리원", "role-3", "한안전", "주임", "환경시험팀", "010-1010-2020", "031-777-8888", null, 31, "2026-10-15", false)],
+  ];
+  const TODAY = new Date("2026-09-29");
+  const dday = (d) => { const n = Math.round((new Date(d) - TODAY) / 864e5); const cls = n < 0 ? "over" : n <= 30 ? "soon" : ""; return `<span class="dday ${cls}">${n < 0 ? `D+${-n}` : `D-${n}`}</span>`; };
+  const I = {
+    phone: '<svg class="ic" viewBox="0 0 24 24"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/></svg>',
+    tel: '<svg class="ic" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h10M7 13h6"/></svg>',
+  };
+  const dl = `<i class="org-icon-download"></i>`;
+  const rep = (u) => `<button class="org-report-btn" ${u.report ? "" : "disabled"}>${dl}</button>`;
+
+  const cur = (u) => `
+    <div class="org-card ${u.cls}">
+      <div class="org-card-head"><span class="org-role">${u.role}</span>${rep(u)}</div>
+      <div class="org-dept">${u.dept}</div>
+      <div class="org-name">${u.name}<small>${u.pos}</small></div>
+      <div class="org-phones"><div><span>연락처1</span>${u.p1}</div><div><span>연락처2</span>${u.p2 || "-"}</div></div>
+      <button class="org-detail-btn">세부정보</button>
+    </div>`;
+  const a = (u) => `
+    <div class="ca ${u.cls}">
+      <span class="role-tag">${u.role}</span><span class="rep">${rep(u)}</span>
+      <div class="avatar">${u.name[0]}</div>
+      <div class="nm">${u.name}<small>${u.pos}</small></div>
+      <div class="dp">${u.dept}</div>
+      <div class="ph"><div>${I.phone}${u.p1}</div><div>${I.tel}${u.p2 || "-"}</div></div>
+      <div class="chips"><span class="chip">담당장비 ${u.equip}대</span>${u.backup ? `<span class="chip">대직 ${u.backup}</span>` : ""}</div>
+      <div class="foot"><button>세부정보</button></div>
+    </div>`;
+  const b = (u) => `
+    <div class="cb ${u.cls}">
+      <div class="avatar">${u.name[0]}</div>
+      <div class="body">
+        <div class="l1"><span class="nm">${u.name}</span><span class="ps">${u.pos}</span><span class="rl">${u.role}</span></div>
+        <div class="l2">${u.dept} · 담당장비 ${u.equip}대</div>
+        <div class="l3"><span>${I.phone}${u.p1}</span>${u.p2 ? `<span>${I.tel}${u.p2}</span>` : ""}</div>
+      </div>
+      <span class="rep">${rep(u)}</span>
+    </div>`;
+  const c = (u) => `
+    <div class="cc ${u.cls}">
+      <div class="hd">
+        <div class="rl">${u.role}</div>
+        <div class="nm">${u.name}<small>${u.pos}</small></div>
+        <div class="dp">${u.dept}</div>
+        <span class="rep ${u.report ? "" : "off"}">${dl}</span>
+      </div>
+      <dl class="bd">
+        <dt>연락처1</dt><dd>${u.p1}</dd>
+        <dt>연락처2</dt><dd>${u.p2 || "-"}</dd>
+        <dt>대직자</dt><dd>${u.backup || "-"}</dd>
+        <dt>담당장비</dt><dd>${u.equip}대</dd>
+        <dt>차기교육</dt><dd>${u.next.replace(/-/g, ".")} ${dday(u.next)}</dd>
+      </dl>
+      <div class="ft"><button>세부정보</button></div>
+    </div>`;
+  const render = (id, fn) => (document.getElementById(id).innerHTML = TIERS.map((t) => `<div class="org-tier"><div class="org-cards">${t.map(fn).join("")}</div></div>`).join(""));
+  render("cur", cur); render("a", a); render("b", b); render("c", c);
+</script>
+</body>
+</html>

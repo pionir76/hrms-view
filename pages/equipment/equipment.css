@@ -41,6 +41,15 @@ body.eq-modal-open {
   table-layout: fixed;
 }
 
+/* 위치·장비명은 길어도 한 줄로 — 넘치면 말줄임(…)하고 전체 내용은 마우스를 올려 툴팁으로 본다.
+   표가 table-layout: fixed라 열 폭이 고정돼 있어 그대로 말줄임이 걸린다. */
+.eq-list-table td:nth-child(2),
+.eq-list-table td:nth-child(3) {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* 순번은 가운데 정렬(교육훈련 목록과 동일) */
 .eq-list-table th:first-child,
 .eq-list-table td:first-child {

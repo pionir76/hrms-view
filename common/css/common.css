@@ -1787,7 +1787,7 @@ select::-ms-expand {
 }
 
 /* ---------- O / X / 해당없음 토글 버튼 (common/js/ui.js의 oxCellClass와 짝) ----------
-   점검일지·운전일지가 공유한다. 누를 때마다 O → X → / → 미기록으로 돈다. */
+   점검일지·운전일지가 공유한다. 누를 때마다 O → / → X → 미기록으로 돈다. */
 
 /* vertical-align: middle이 핵심 — 인라인 요소는 기본값(baseline)으로 줄 안에 놓이는데,
    버튼 내용이 비면(미기록 상태) 기준선이 글자 baseline이 아니라 박스 아래쪽으로 잡혀서
@@ -1814,6 +1814,17 @@ select::-ms-expand {
 .ox-toggle-btn:disabled {
   cursor: not-allowed;
   opacity: 0.6;
+}
+
+/* O / / / X 아이콘(ui.js oxToggleSymbol) — 버튼(30px)을 넉넉히 채우는 크기로 */
+.ox-toggle-btn .ox-icon {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  pointer-events: none;
 }
 
 .ox-toggle-btn.cell-O {
@@ -1899,4 +1910,340 @@ select::-ms-expand {
   background-color: var(--status-alarm-text, #d03b3b);
   -webkit-mask: url("../../assets/delete.svg") center / 18px 18px no-repeat;
   mask: url("../../assets/delete.svg") center / 18px 18px no-repeat;
+}
+
+/* ---------- 결재 알림(상단바 벨) + 일괄 결재 팝업 (common/js/approval-inbox.js) ---------- */
+
+.topbar-approval {
+  position: relative;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 10px;
+  background: #f1f4fa;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.topbar-approval[hidden] {
+  display: none;
+}
+
+.topbar-approval:hover {
+  background: #e7ecf6;
+}
+
+.topbar-approval svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: var(--color-text-sub);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.topbar-approval-count {
+  position: absolute;
+  top: -5px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  display: grid;
+  place-items: center;
+  border-radius: 99px;
+  background: #e0364d;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  font-style: normal;
+  box-shadow: 0 2px 6px -2px rgba(224, 54, 77, 0.8);
+}
+
+.modal-box.ap-box {
+  width: 1100px;
+  max-width: calc(100vw - 48px);
+  height: 660px;
+  max-height: calc(100vh - 64px);
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+
+.ap-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 24px 16px;
+  border-bottom: 1px solid var(--color-border-soft);
+}
+
+.ap-eyebrow {
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: var(--color-text-faint);
+}
+
+.ap-title {
+  margin: 2px 0 0;
+  font-size: 19px;
+  letter-spacing: -0.02em;
+}
+
+.ap-head-sub {
+  align-self: flex-end;
+  font-size: 12.5px;
+  color: var(--color-text-muted);
+}
+
+.ap-head .modal-close-btn {
+  margin-left: auto;
+}
+
+.ap-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 210px 1fr;
+}
+
+/* 좌측 문서 그룹 */
+.ap-groups {
+  min-height: 0; /* 그리드 항목 기본값(auto)이면 내용이 길 때 칸이 늘어난다 */
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 12px;
+  border-right: 1px solid var(--color-border-soft);
+  background: #fafbfd;
+  overflow-y: auto;
+}
+
+.ap-groups-title {
+  padding: 4px 10px 8px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--color-text-faint);
+}
+
+.ap-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 12px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--color-text-sub);
+  text-align: left;
+  cursor: pointer;
+}
+
+.ap-group:hover {
+  background: #eef2f9;
+}
+
+.ap-group em {
+  margin-left: auto;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 6px;
+  display: grid;
+  place-items: center;
+  border-radius: 99px;
+  background: #e9edf5;
+  color: var(--color-text-muted);
+  font-size: 11.5px;
+  font-weight: 800;
+  font-style: normal;
+}
+
+.ap-group.active {
+  background: #fff;
+  color: var(--color-text);
+  font-weight: 800;
+  box-shadow: var(--shadow-pop);
+}
+
+.ap-group.active em {
+  background: var(--accent-grad);
+  color: #fff;
+}
+
+.ap-group.empty {
+  color: var(--color-text-faint);
+}
+
+/* 우측 목록 */
+.ap-list {
+  min-width: 0;
+  min-height: 0; /* 목록이 길어도 푸터(선택 항목 결재)가 밀려나지 않게 — 목록만 스크롤된다 */
+  display: flex;
+  flex-direction: column;
+}
+
+.ap-list-bar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--color-border-soft);
+}
+
+.ap-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.ap-check:disabled {
+  color: var(--color-text-faint);
+  cursor: default;
+}
+
+.ap-box-check {
+  width: 17px;
+  height: 17px;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid #c7cedb;
+  border-radius: 5px;
+  background: #fff;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.ap-box-check.checked {
+  background: var(--accent-grad);
+  border-color: transparent;
+}
+
+.ap-box-check.partial {
+  border-color: #6a4cf5;
+}
+
+.ap-box-check.partial::after {
+  content: "";
+  width: 9px;
+  height: 2px;
+  border-radius: 2px;
+  background: #6a4cf5;
+}
+
+.ap-count {
+  font-size: 12.5px;
+  color: var(--color-text-muted);
+}
+
+.ap-count b {
+  color: var(--color-text);
+}
+
+.ap-list-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.ap-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ap-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 10px 20px;
+  background: #fff;
+  border-bottom: 1px solid var(--color-border-soft);
+  text-align: left;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--color-text-faint);
+}
+
+.ap-table td {
+  padding: 12px 20px;
+  border-bottom: 1px solid #f4f6fa;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.ap-table tbody tr:hover td {
+  background: #f8faff;
+}
+
+.ap-table tr.selected td {
+  background: #f6f8ff;
+}
+
+.ap-item-title {
+  font-weight: 600;
+}
+
+.ap-item-sub {
+  display: block;
+  font-size: 11.5px;
+  color: var(--color-text-muted);
+}
+
+.ap-item-date {
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-sub);
+}
+
+.ap-foot {
+  flex-shrink: 0; /* 목록 길이와 무관하게 항상 같은 자리 */
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 24px;
+  border-top: 1px solid var(--color-border-soft);
+  background: #fbfcfe;
+}
+
+.ap-foot-info {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.ap-foot-info b {
+  color: var(--color-primary);
+}
+
+.ap-foot-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+
+/* ---------- 문서(점검일지·운전일지) 우측 상단 장비 운영 상태 — 배지 없이 글자만 ---------- */
+.doc-operating-status {
+  flex-shrink: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-text-sub);
+  white-space: nowrap;
 }

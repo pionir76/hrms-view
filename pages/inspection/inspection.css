@@ -307,3 +307,34 @@
   display: flex;
   gap: 8px;
 }
+
+/* ---------- 우측 상단: 선택한 장비의 운영 상태 (표시만) ---------- */
+
+.insp-equip-status {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: #fff;
+}
+
+.insp-equip-status[hidden] {
+  display: none;
+}
+
+.insp-equip-status-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+/* 점검표 머리 — 좌측 장비·기간, 우측 운영 상태 글자 */
+.inspection-modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}

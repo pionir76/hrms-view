@@ -59,6 +59,9 @@ function formatTopbarDateTime(date) {
   };
 }
 
+// 결재 알림(벨) — 일괄 결재 팝업은 common/js/approval-inbox.js가 그린다
+const TB_ICON_APPROVAL = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>`;
+
 function buildTopbarHtml(session, activePage) {
   const menuHtml = MENU.map(
     (item) => `<a class="menu-item${item.id === activePage ? " active" : ""}" href="${item.href}">${item.label}</a>`
@@ -73,6 +76,9 @@ function buildTopbarHtml(session, activePage) {
       </span>
     </a>
     <nav class="topbar-menu">${menuHtml}</nav>
+    <button type="button" class="topbar-approval" id="topbarApprovalBtn" hidden aria-label="결재할 문서">
+      ${TB_ICON_APPROVAL}<em class="topbar-approval-count">0</em>
+    </button>
     <div class="topbar-user" id="topbarUser">${buildUserHtml(session)}</div>
     <span class="topbar-divider" aria-hidden="true"></span>
     <span class="topbar-clock" id="topbarClock"></span>
@@ -137,6 +143,12 @@ function renderLayout() {
   topbarEl.innerHTML = buildTopbarHtml(session, activePage);
   bindUserMenu();
   startClock();
+
+  // 결재 알림 — 스크립트를 안 넣은 화면(로그인 등)에서는 조용히 건너뛴다
+  if (typeof startApprovalBadgePolling === "function") {
+    document.getElementById("topbarApprovalBtn").addEventListener("click", openApprovalInbox);
+    startApprovalBadgePolling();
+  }
 
   // 드롭다운 바깥을 누르거나 Esc를 누르면 닫는다(사용자 영역은 다시 그려질 수 있어 document에 한 번만 건다)
   document.addEventListener("click", (event) => {

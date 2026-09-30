@@ -144,13 +144,13 @@ function renderPager(el, { total, page, pageSize = LIST_PAGE_SIZE, onChange }) {
 // ---------- O / X / 해당없음 토글 (점검일지 · 운전일지 공통) ----------
 //
 // 저장되는 값은 "O" / "X" / "/" / null(미기록) 네 가지이고, 버튼을 누를 때마다
-// O → X → / → 미기록 순으로 돈다. 화면에는 영문 대신 기호로 보여준다.
+// O → / → X → 미기록 순으로 돈다(사용자 결정 2026-09-29). 화면에는 O / / / X 모양 아이콘으로 보여준다.
 // 버튼 마크업: <button class="ox-toggle-btn ${oxCellClass(value)}">${oxToggleSymbol(value)}</button>
 
 function cycleOxValue(current) {
-  if (current === "O") return "X";
-  if (current === "X") return "/";
-  if (current === "/") return null;
+  if (current === "O") return "/";
+  if (current === "/") return "X";
+  if (current === "X") return null;
   return "O";
 }
 
@@ -161,11 +161,19 @@ function oxCellClass(value) {
   return "";
 }
 
+// O / / / X 모양을 SVG로 그린다(사용자 결정 2026-09-29 — 예전엔 ✓ / ✕ / – 글자). 글꼴에 따라 굵기·크기가
+// 들쭉날쭉하지 않게 선으로 그리고, 색은 버튼 글자색(currentColor)을 따른다. HTML 문자열이므로 innerHTML로 넣는다.
+const OX_ICON_PATHS = {
+  O: '<circle cx="12" cy="12" r="8.5" />',
+  "/": '<path d="M18 3.5 6 20.5" />',
+  X: '<path d="M5 5l14 14M19 5 5 19" />',
+};
+
 function oxToggleSymbol(value) {
-  if (value === "O") return "✓";
-  if (value === "X") return "✕";
-  if (value === "/") return "–";
-  return "";
+  const paths = OX_ICON_PATHS[value];
+  // <title>에 값을 넣어 두면 셀의 textContent가 "O"/"/"/"X"가 된다 — 마우스를 올리면 값이 뜨고,
+  // 표를 글자로 읽는 쪽(스크린리더, 예전 엑셀 저장)도 아이콘 칸의 값을 알 수 있다.
+  return paths ? `<svg class="ox-icon" viewBox="0 0 24 24" role="img"><title>${value}</title>${paths}</svg>` : "";
 }
 
 function confirmDiscardIfDirty(tracker, message = "저장하지 않은 변경사항이 있습니다. 저장하지 않고 닫으시겠습니까?") {
@@ -258,4 +266,17 @@ function hexToRgba(hex, alpha) {
   const g = parseInt(hex.slice(3, 5), 16);
   const b = parseInt(hex.slice(5, 7), 16);
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+// ---------- 장비 운영 상태 (점검일지·운전일지 문서 우측 상단 표시용) ----------
+//
+// 관리자가 정하는 운영 상태(운영/미운영/수리중 …)를 장비 1건 조회로 새로 읽는다. 문서를 여는 시점의
+// 값이며, 읽지 못하면 fallback(목록에서 받아 둔 값)을 쓴다. 문서 표시·PDF 모두 이 값을 글자로 쓴다.
+async function fetchEquipmentOperatingStatus(equipmentId, fallback) {
+  try {
+    const equipment = await apiFetch(`/api/equipments/${equipmentId}`);
+    return (equipment && equipment.status) || fallback || "";
+  } catch (err) {
+    return fallback || "";
+  }
 }

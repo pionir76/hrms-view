@@ -120,12 +120,21 @@ body.page-dashboard {
 
 /* ---------- 본문: 좌(KPI + 장비 리스트) / 우(시스템 정보 + 서버 상태) ---------- */
 
+/* 우측(시스템 정보·서버 상태)은 평소 폭 0으로 접혀 있고, .sys-open이면 폭이 늘면서 좌측이 그만큼 줄어든다.
+   카드는 고정 폭(--sys-w)으로 우측 끝에 붙여 두어, 열리는 동안 찌그러지지 않고 오른쪽에서 밀려 나온다. */
 .db-body {
+  --sys-w: 380px;
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 380px;
-  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) 0px;
+  column-gap: 0;
+  transition: grid-template-columns 0.32s ease, column-gap 0.32s ease;
+}
+
+.db-body.sys-open {
+  grid-template-columns: minmax(0, 1fr) var(--sys-w);
+  column-gap: 14px;
 }
 
 .db-col-left,
@@ -134,6 +143,91 @@ body.page-dashboard {
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+
+.db-col-right {
+  min-width: 0;
+  overflow: hidden;
+  align-items: flex-end;
+  opacity: 0;
+  transform: translateX(24px);
+  visibility: hidden;
+  transition: opacity 0.24s ease, transform 0.32s ease, visibility 0s linear 0.32s;
+}
+
+.db-col-right > .db-card {
+  width: var(--sys-w);
+  flex-shrink: 0;
+}
+
+.db-body.sys-open .db-col-right {
+  opacity: 1;
+  transform: none;
+  visibility: visible;
+  transition: opacity 0.24s ease 0.08s, transform 0.32s ease, visibility 0s;
+}
+
+/* 열기/닫기 버튼 */
+.db-sys-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 36px;
+  padding: 0 12px 0 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 11px;
+  background: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-sub);
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+.db-sys-toggle:hover {
+  border-color: var(--color-border-strong);
+  color: var(--color-text);
+}
+
+.db-sys-toggle[aria-expanded="true"] {
+  background: var(--color-brand-navy);
+  border-color: var(--color-brand-navy);
+  color: #fff;
+}
+
+.db-sys-toggle svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 0.32s ease;
+}
+
+.db-sys-toggle[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+.db-sys-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #a3abbb;
+}
+
+.db-sys-dot.ok { background: #12b76a; box-shadow: 0 0 0 3px rgba(18, 183, 106, 0.18); }
+.db-sys-dot.warn { background: #f79009; box-shadow: 0 0 0 3px rgba(247, 144, 9, 0.2); }
+.db-sys-dot.err { background: #e0364d; box-shadow: 0 0 0 3px rgba(224, 54, 77, 0.2); }
+
+@media (prefers-reduced-motion: reduce) {
+  .db-body,
+  .db-col-right,
+  .db-sys-toggle svg {
+    transition: none;
+  }
 }
 
 .db-card {
@@ -846,6 +940,24 @@ body.page-dashboard {
   text-overflow: ellipsis;
 }
 
+/* 비상정지 배지 — 장비명 바로 옆(이름이 남는 폭을 다 차지하지 않게 하고 배지가 나머지를 밀어낸다) */
+.db-eq.is-emg .db-eq-name {
+  flex: 0 1 auto;
+}
+
+.db-emg {
+  flex-shrink: 0;
+  margin-right: auto;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: #d92d20;
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 800;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
 /* 압축기 수량 배지 — 회색 사각에 수량만(색 변경 없음 — 사용자 결정) */
 .db-comp {
   flex-shrink: 0;
@@ -1169,7 +1281,7 @@ body.page-dashboard {
 /* ---------- 좁은 폭(1366 등) ---------- */
 
 @media (max-width: 1600px) {
-  .db-body { grid-template-columns: minmax(0, 1fr) 340px; }
+  .db-body { --sys-w: 340px; }
   .db-storage { gap: 16px; }
   .db-kpi { gap: 14px; padding: 16px; }
   .db-search { width: 180px; }
@@ -1191,7 +1303,9 @@ body.page-dashboard {
 @media (max-height: 860px) {
   .db-main { padding-top: 12px; gap: 10px; }
   .db-head h1 { font-size: 19px; }
-  .db-body, .db-col-left, .db-col-right, .db-kpis { gap: 10px; }
+  .db-col-left, .db-col-right, .db-kpis { gap: 10px; }
+  .db-body { row-gap: 10px; }
+  .db-body.sys-open { column-gap: 10px; }
   .db-donut { width: 118px; height: 118px; }
   .db-donut-c b { font-size: 26px; }
   .db-donut-c b small { font-size: 14px; }

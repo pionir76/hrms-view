@@ -84,7 +84,9 @@ function wireEscapeKey() {
 
 async function loadEquipments() {
   try {
-    state.equipments = await apiFetch("/api/equipments");
+    // 담당 장비만 — 수정 권한이 담당 기준이라 목록도 같은 기준으로 맞춘다(백엔드 2026-09-28).
+    // 시스템관리자는 mine=true여도 서버가 전체를 준다(담당 배정이 없는 게 보통이라).
+    state.equipments = await apiFetch("/api/equipments?mine=true");
   } catch (err) {
     document.getElementById("equipmentListBody").innerHTML =
       `<tr><td colspan="7"><div class="empty-state">불러오지 못했습니다. (${escapeHtml(err.message)})</div></td></tr>`;
@@ -204,11 +206,20 @@ function renderEquipmentList() {
     .filter((e) => !buildingName || e.buildingName === buildingName)
     .filter((e) => !status || e.status === status)
     .filter((e) => !search || e.name.toLowerCase().includes(search))
-    .sort((a, b) => a.buildingName.localeCompare(b.buildingName, "ko") || a.name.localeCompare(b.name, "ko"));
+    // 지구 → 시설동 → 장비명 순 — 실시간 현황·자료 조회·조직 관리와 같은 기준이다
+    // (compareRegion은 common/js/ui.js. 지구 표기가 "A 지구"처럼 바뀌어도 가나다순으로 따라간다)
+    .sort(
+      (a, b) =>
+        compareRegion(a.region, b.region) ||
+        a.buildingName.localeCompare(b.buildingName, "ko") ||
+        a.name.localeCompare(b.name, "ko")
+    );
 
   const tbody = document.getElementById("equipmentListBody");
   if (rows.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state">조건에 맞는 장비가 없습니다.</div></td></tr>`;
+    // 담당 장비 자체가 없는 경우와 필터 결과가 없는 경우를 구분해서 알려준다
+    const message = state.equipments.length === 0 ? "담당 장비가 없습니다. 시스템관리자에게 담당 장비 등록을 요청하세요." : "조건에 맞는 장비가 없습니다.";
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state">${message}</div></td></tr>`;
     renderEquipmentPager(0);
     return;
   }
@@ -219,11 +230,13 @@ function renderEquipmentList() {
   tbody.innerHTML = pageItems
     .map((e, i) => {
       const compressorCount = e.compressorCount ?? 0;
+      // 열 폭이 고정이라 긴 위치·장비명은 잘린다 — 잘린 내용을 마우스로 확인할 수 있게 통째로 단다
+      const fullLabel = escapeHtml(`${formatLocation(e)} · ${e.name}`);
       return `
         <tr data-id="${e.id}">
           <td>${start + i + 1}</td>
-          <td>${escapeHtml(formatLocation(e))}</td>
-          <td><span class="row-link" data-id="${e.id}">${escapeHtml(e.name)}</span></td>
+          <td title="${fullLabel}">${escapeHtml(formatLocation(e))}</td>
+          <td title="${fullLabel}"><span class="row-link" data-id="${e.id}">${escapeHtml(e.name)}</span></td>
           <td>${escapeHtml(e.managementNumber ?? "-")}</td>
           <td>${statusBadge(e.status)}</td>
           <td><button type="button" class="eq-count-btn${compressorCount === 0 ? " eq-count-zero" : ""}" data-kind="compressor" data-id="${e.id}">COMP#${compressorCount}</button></td>

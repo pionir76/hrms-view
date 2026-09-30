@@ -185,6 +185,10 @@
               <div class="om-sec-head">
                 <h3 class="om-sec-title">담당장비</h3>
                 <span class="om-equip-count" id="omEquipCount">선택 0대</span>
+                <!-- 전체 선택/해제 — 검색 중이면 검색 결과에 보이는 장비만 대상 -->
+                <button type="button" class="om-equip-all" id="omEquipAll">
+                  <span class="om-cb" id="omEquipAllCb"></span><span id="omEquipAllLabel">전체 선택</span>
+                </button>
                 <input type="search" class="om-search om-equip-search" id="omEquipSearch" placeholder="장비명·시설동 검색" />
               </div>
               <div class="om-equip-groups" id="omEquipGroups"></div>
@@ -231,6 +235,7 @@
   <script src="../../common/js/api.js"></script>
   <script src="../../common/js/ui.js"></script>
   <script src="../../common/js/attachments.js"></script>
+  <script src="../../common/js/approval-inbox.js"></script>
   <script src="../../common/js/layout.js"></script>
   <script src="org.js"></script>
   <script>

@@ -357,3 +357,81 @@
   display: flex;
   gap: 8px;
 }
+
+/* ---------- PDF 저장용 표 (common/js/pdf-export.js, 시안 mokup/operation_pdf_v1) ----------
+   A4 세로 폭(680px)에 9칸이 들어가게 화면 표보다 글자·여백을 줄인다.
+   화면 표 클래스(.op-sub 등)와 섞이지 않게 op-pdf- 접두어를 쓴다.
+   공통 pdf-export.css가 이 파일보다 나중에 읽히므로 .pdf-table.op-pdf-table로 우선순위를 올린다. */
+
+.pdf-table.op-pdf-table th {
+  padding: 5px 4px;
+  font-size: 10.5px;
+}
+
+.pdf-table.op-pdf-table td {
+  padding: 4px 5px;
+  font-size: 11px;
+  text-align: center;
+  vertical-align: middle;
+  white-space: normal;
+}
+
+.pdf-table.op-pdf-table td.op-pdf-l {
+  font-weight: 600;
+  color: var(--color-text-sub);
+}
+
+.pdf-table.op-pdf-table td.op-pdf-sub {
+  white-space: nowrap;
+  font-size: 10.5px;
+}
+
+.pdf-table.op-pdf-table td.op-pdf-ref {
+  text-align: left;
+  font-size: 9.5px;
+  line-height: 1.45;
+  color: var(--color-text-muted);
+}
+
+.pdf-table.op-pdf-table td.op-pdf-val {
+  font-variant-numeric: tabular-nums;
+}
+
+.pdf-table.op-pdf-table td.op-pdf-note {
+  text-align: left;
+  font-size: 9.5px;
+  line-height: 1.55;
+  color: var(--color-text-muted);
+}
+
+.pdf-table.op-pdf-table .ox-toggle-btn {
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  cursor: default;
+}
+
+.pdf-table.op-pdf-table .ox-toggle-btn .ox-icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* 한 쪽에 들어가는 계통은 쪽 사이에서 잘리지 않게 — 압축기가 많아 긴 냉매계통은 행 단위로 나뉜다 */
+.pdf-table.op-pdf-table tbody.op-pdf-keep {
+  break-inside: avoid;
+}
+
+.op-pdf-printed {
+  margin-top: 6px;
+  text-align: right;
+  font-size: 10px;
+  color: var(--color-text-muted);
+}
+
+/* 일지 머리 우측 — 운영 상태 글자 + 날짜 배지 */
+.op-report-right {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}

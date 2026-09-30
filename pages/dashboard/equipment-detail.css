@@ -108,6 +108,126 @@
   width: 100%;
 }
 
+/* 권한 없는 역할은 카드 자체를 숨긴다 */
+.detail-emergency[hidden] {
+  display: none;
+}
+
+/* 비상정지 중 — 카드 전체를 빨간 면으로 뒤집고 버튼은 흰 바탕 빨간 글자 */
+.detail-emergency.is-active {
+  background: linear-gradient(160deg, #e0362a, #b42318);
+  border-color: #b42318;
+  color: #fff;
+  box-shadow: 0 0 0 3px rgba(217, 45, 32, 0.22), 0 10px 24px -10px rgba(180, 35, 24, 0.7);
+}
+
+.detail-emergency.is-active .detail-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #fff;
+}
+
+.detail-emergency.is-active .detail-card-title::before {
+  display: none;
+}
+
+.detail-emergency.is-active .detail-emergency-note {
+  color: rgba(255, 255, 255, 0.92);
+  font-weight: 600;
+}
+
+.detail-emergency.is-active .detail-emergency-btn {
+  background: #fff;
+  color: #b42318;
+  font-weight: 800;
+}
+
+.detail-emergency.is-active .detail-emergency-btn:hover {
+  background: #fff1f0;
+}
+
+.emg-dot {
+  position: relative;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #fff;
+}
+
+.emg-dot::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.7);
+  animation: emg-pulse 1.4s ease-out infinite;
+}
+
+@keyframes emg-pulse {
+  from { transform: scale(0.6); opacity: 1; }
+  to { transform: scale(1.6); opacity: 0; }
+}
+
+/* 장비명 옆 배지 */
+.badge-emg {
+  background: #d92d20;
+  color: #fff;
+  font-weight: 800;
+}
+
+/* 재확인 모달 */
+.emg-modal-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.emg-modal-head svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: #d92d20;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.emg-modal-head svg[hidden] {
+  display: none;
+}
+
+.emg-modal-text {
+  margin: 0;
+}
+
+.emg-modal-text b {
+  color: #b42318;
+}
+
+.emg-pw-field {
+  margin-top: 14px;
+}
+
+.emg-pw-field[hidden] {
+  display: none;
+}
+
+.emg-pw-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.emg-pw-hint.is-error {
+  font-weight: 600;
+  color: #d92d20;
+}
+
+.emg-pw-field input.is-error {
+  border-color: #d92d20;
+}
+
 /* ---------- 우측 ---------- */
 
 .detail-right {

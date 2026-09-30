@@ -93,6 +93,8 @@ function initDashboard() {
     if (event.key === "Escape" && dbState.panelOpen) toggleEventsPanel();
   });
 
+  document.getElementById("dbSysToggle").addEventListener("click", toggleSystemPanel);
+
   loadEquipments();
   setInterval(loadEquipments, EQUIPMENT_POLL_MS);
   loadSystemStatus();
@@ -272,7 +274,9 @@ function equipmentRowHtml(e) {
   // 통신이 끊기면 백엔드가 hasAlarm을 항상 false로 내린다(백엔드 변경 2026-09-28) — "경보 없음"이
   // 아니라 "알 수 없음"이므로, 경보 배지를 꺼진 모양 그대로 두지 않고 흐리게 구분한다.
   const alarmUnknown = comm;
+  const emergency = !!e.isEmergencyStopped; // 70번(2026-09-29) — 현장 패널에서 직접 누른 경우도 반영된다
   const stateText = [
+    emergency ? "비상정지" : null,
     e.isRunning ? "운전" : "정지",
     comm ? "통신 불량" : null,
     alarmUnknown ? "경보 여부 알 수 없음" : e.hasAlarm ? "경보" : null,
@@ -281,9 +285,10 @@ function equipmentRowHtml(e) {
     .join(", ");
 
   return `
-    <div class="db-eq" data-equipment-id="${e.id}" role="link" tabindex="0" title="${escapeHtml(e.name)} — ${stateText}">
+    <div class="db-eq${emergency ? " is-emg" : ""}" data-equipment-id="${e.id}" role="link" tabindex="0" title="${escapeHtml(e.name)} — ${stateText}">
       <span class="db-dot ${dotClass}"></span>
       <span class="db-eq-name">${escapeHtml(e.name)}</span>
+      ${emergency ? `<span class="db-emg">비상정지</span>` : ""}
       <span class="db-comp" title="압축기 ${compressorCount}대">${compressorCount}</span>
       <span class="db-onoff comm${comm ? " on" : ""}">통신</span>
       <span class="db-onoff alarm${e.hasAlarm ? " on" : ""}${alarmUnknown ? " unknown" : ""}"${
@@ -322,6 +327,25 @@ function formatUptime(startedAtIso) {
   return `${m}분`;
 }
 
+// 우측 시스템 정보·서버 상태 패널 — 평소엔 접어 두고(열린 상태를 기억하지 않음) 버튼으로 연다.
+// 접혀 있어도 30초 갱신은 계속해서 버튼의 상태 점을 맞춘다.
+function toggleSystemPanel() {
+  const body = document.querySelector(".db-body");
+  const open = body.classList.toggle("sys-open");
+  document.getElementById("dbSysToggle").setAttribute("aria-expanded", String(open));
+  document.getElementById("dbColRight").setAttribute("aria-hidden", String(!open));
+}
+
+// 서버·API 중 나쁜 쪽을 버튼 점 색으로
+function renderSystemDot(statuses) {
+  const rank = { 정상: 1, 주의: 2, 오류: 3 };
+  const worst = statuses.reduce((a, b) => ((rank[b] || 0) > (rank[a] || 0) ? b : a), null);
+  const cls = worst === "정상" ? "ok" : worst === "주의" ? "warn" : worst === "오류" ? "err" : "none";
+  const dot = document.getElementById("dbSysDot");
+  dot.className = `db-sys-dot ${cls}`;
+  document.getElementById("dbSysToggle").title = `서버 상태: ${worst || "알 수 없음"}`;
+}
+
 async function loadSystemStatus() {
   const errorEl = document.getElementById("sysError");
   const started = performance.now();
@@ -332,8 +356,10 @@ async function loadSystemStatus() {
     errorEl.textContent = `시스템 정보를 불러오지 못했습니다. (${err.message})`;
     errorEl.hidden = false;
     document.getElementById("srvApi").innerHTML = `${healthBadge("오류")}<small>응답 없음</small>`;
+    renderSystemDot(["오류"]);
     return;
   }
+  renderSystemDot([s.server && s.server.status, s.api && s.api.status]);
   const responseMs = Math.round(performance.now() - started);
   errorEl.hidden = true;
 

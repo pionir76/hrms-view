@@ -43,6 +43,7 @@ function initTrainingPage() {
   document.getElementById("trCancelBtn").addEventListener("click", closeTrainingModal);
   document.getElementById("trSaveBtn").addEventListener("click", saveTraining);
   document.getElementById("trDeleteBtn").addEventListener("click", deleteTraining);
+  document.getElementById("trPdfBtn").addEventListener("click", exportTrainingPdf);
   document.getElementById("trResetApprovalsBtn").addEventListener("click", resetTrainingApprovals);
   document.getElementById("trAttachmentInput").addEventListener("change", (event) => {
     const selected = Array.from(event.target.files);
@@ -191,6 +192,7 @@ function startTrainingNewDraft() {
   document.getElementById("trLockNotice").hidden = true;
   document.getElementById("trDeleteBtn").hidden = true;
   document.getElementById("trResetApprovalsBtn").hidden = true;
+  document.getElementById("trPdfBtn").hidden = true; // 저장 전 문서는 PDF 대상이 아니다
   document.getElementById("trSaveBtn").hidden = false;
   document.getElementById("trAuditInfo").textContent = "";
 
@@ -260,6 +262,13 @@ function applyTrainingPermissions(item) {
 
   const isSystemAdmin = getSession()?.role === "시스템관리자";
   document.getElementById("trResetApprovalsBtn").hidden = !(isSystemAdmin && isApprovalStarted(item));
+
+  // PDF는 결재가 끝난 문서만(사용자 결정 2026-09-29) — 버튼은 보이되 잠가서 기능이 있음을 알린다
+  const pdfBtn = document.getElementById("trPdfBtn");
+  const complete = isApprovalComplete(item);
+  pdfBtn.hidden = false;
+  pdfBtn.disabled = !complete;
+  pdfBtn.title = complete ? "" : "결재가 완료된 문서만 PDF로 저장할 수 있습니다";
   updateTrainingAttachmentControls();
 }
 
@@ -380,6 +389,67 @@ function showTrainingError(message) {
   const el = document.getElementById("trModalError");
   el.textContent = message;
   el.hidden = false;
+}
+
+// ---------- PDF 저장 (common/js/pdf-export.js) ----------
+//
+// 결재 완료 문서는 수정이 막혀 있으므로 화면 입력칸이 아니라 저장된 문서(state.current)로 만든다.
+// 첨부 목록은 모달을 연 직후 비동기로 받아 오므로, 누른 시점에 다시 받아 빠짐없이 넣는다.
+
+async function exportTrainingPdf() {
+  const item = state.current;
+  if (!item || !isApprovalComplete(item)) return;
+
+  let attachments = state.attachments;
+  try {
+    attachments = await fetchAttachments("TrainingLog", item.id);
+  } catch (err) {
+    // 다시 받기 실패 시 화면에 떠 있는 목록으로 대신한다
+  }
+
+  // 결재란은 화면과 같은 공통 모듈로 그리고, 조작 버튼(취소)만 걷어낸다
+  const approvalEl = document.createElement("div");
+  approvalEl.className = "approval-bar";
+  renderApprovalBar(approvalEl, item, { allowApprove: false, emptyDoc: TRAINING_EMPTY_APPROVAL });
+  approvalEl.querySelectorAll("button").forEach((btn) => btn.remove());
+
+  const performedAt = toKstDateString(item.performedAt);
+  const text = (value) => escapeHtml(value ?? "");
+  const attachmentHtml = attachments.length
+    ? `<ul>${attachments
+        .map((a) => `<li>${text(a.fileName)}<span>${formatFileSize(a.sizeBytes)}</span></li>`)
+        .join("")}</ul>`
+    : `<ul><li>없음</li></ul>`;
+
+  printPdfDocument({
+    fileName: pdfSafeFileName(["교육훈련일지", performedAt, item.title]),
+    html: `
+      <div class="pdf-doc">
+        <div class="pdf-head">
+          <h1 class="pdf-title"><small>TRAINING</small>교육훈련 일지</h1>
+          ${approvalEl.outerHTML}
+        </div>
+        <table class="pdf-table">
+          <colgroup><col style="width:16%" /><col style="width:34%" /><col style="width:16%" /><col style="width:34%" /></colgroup>
+          <tbody>
+            <tr><th>제목</th><td colspan="3">${text(item.title)}</td></tr>
+            <tr><th>일시</th><td>${text(performedAt)}</td><th>장소</th><td>${text(item.location)}</td></tr>
+            <tr><th>강사</th><td colspan="3">${text(item.instructor)}</td></tr>
+            <tr class="pdf-row-free"><th>교육내용</th><td colspan="3" class="pdf-tall">${text(item.content)}</td></tr>
+            <tr class="pdf-row-free"><th>참석자 명단</th><td colspan="3">${text(item.attendees)}</td></tr>
+          </tbody>
+        </table>
+        <div class="pdf-attach">
+          <div class="pdf-attach-title">첨부파일 (${attachments.length})</div>
+          ${attachmentHtml}
+        </div>
+        <div class="pdf-foot">
+          <span>${text(formatTrainingAuditInfo(item))}</span>
+          <span>${text(pdfPrintedByText())}</span>
+        </div>
+      </div>
+    `,
+  });
 }
 
 // ---------- 결재 (그리기는 common/js/approval.js, API 호출만 여기서) ----------

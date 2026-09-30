@@ -1,4 +1,4 @@
-// CH01~CH07 채널 공통 정의 (reference/overview.md 8.1 센서 채널 정의 참고)
+// CH01~CH07 채널 공통 정의 (백엔드 기능 명세의 센서 채널 정의 기준)
 // 채널값 자체는 TLC 원시값(raw int16)이며, 실제 값으로 변환하려면
 // GET /api/compressors/{id}/channel-settings의 decimalPlaces를 적용한다
 // (reference/api-manual.md 5-1번).
