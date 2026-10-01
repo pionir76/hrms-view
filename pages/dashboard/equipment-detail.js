@@ -65,7 +65,18 @@ function isViewingToday() {
   return state.date === todayDateString();
 }
 
+// 실시간 현황 맵에서 들어왔으면(from=map) "실시간 현황으로"가 맵 모드·보던 지구로 돌아가게 한다
+function setupBackLink() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("from") !== "map") return;
+  const back = new URLSearchParams({ mode: "map" });
+  const tab = params.get("tab");
+  if (tab && /^(all|[A-Z])$/.test(tab)) back.set("tab", tab);
+  document.querySelector(".back-link").href = `dashboard.html?${back}`;
+}
+
 async function initEquipmentDetail() {
+  setupBackLink();
   state.equipmentId = getEquipmentIdFromQuery();
   if (!state.equipmentId) {
     document.getElementById("equipmentTitle").textContent = "잘못된 요청입니다.";

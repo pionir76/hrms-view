@@ -1359,3 +1359,593 @@ body.page-dashboard {
   .db-srv-ico { width: 22px; height: 22px; border-radius: 7px; }
   .db-srv-ico svg { width: 13px; height: 13px; }
 }
+
+/* ---------- 맵 모드 (dashboard-map.js, 시안 mokup/dashboard_map_v2) ----------
+   맵 모드에서는 요약 카드·장비 리스트 자리를 지도 카드가 차지한다. */
+
+.db-map {
+  display: none;
+}
+
+.db-col-left.is-map .db-kpis,
+.db-col-left.is-map .db-list {
+  display: none;
+}
+
+.db-col-left.is-map .db-map {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: var(--shadow-card);
+}
+
+.db-map-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.db-map-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-border-soft);
+}
+
+.db-map-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.db-map-tab {
+  padding: 5px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 99px;
+  background: #fff;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--color-text-sub);
+  cursor: pointer;
+}
+
+.db-map-tab.on {
+  border-color: var(--color-brand-navy);
+  background: var(--color-brand-navy);
+  color: #fff;
+}
+
+.db-map-legend {
+  margin-left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 12px;
+  color: var(--color-text-sub);
+}
+
+.db-map-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.db-map-legend i {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+/* 상태 색 — 범례·팝업 점이 같은 값을 쓴다(지도 칠하기는 아래 .db-map-bld.st-*) */
+.db-map i.c-alarm { background: #e0364d; }
+.db-map i.c-comm { background: #f79009; }
+.db-map i.c-run { background: #12b76a; }
+.db-map i.c-idle { background: #b4bccb; }
+.db-map i.c-none { background: #f2f4f7; border: 1px solid #c5cdd9; }
+.db-map em.c-alarm { color: #e0364d; }
+.db-map em.c-comm { color: #b54708; }
+.db-map em.c-run { color: #0f9467; }
+.db-map em.c-idle { color: #6a7489; }
+.db-map-legend i.c-alarm { animation: db-map-legend-blink 1s ease-in-out infinite; }
+
+@keyframes db-map-legend-blink {
+  50% { opacity: 0.35; }
+}
+
+/* 배경 — 파스텔 색이 천천히 흐른다 */
+.db-map-stagewrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(42% 60% at 15% 20%, rgba(150, 182, 228, 0.55), transparent 70%),
+    radial-gradient(40% 55% at 85% 25%, rgba(176, 162, 222, 0.5), transparent 70%),
+    radial-gradient(45% 60% at 70% 90%, rgba(140, 200, 180, 0.5), transparent 70%),
+    radial-gradient(38% 50% at 20% 85%, rgba(222, 182, 166, 0.45), transparent 70%),
+    #dfe4ec;
+  background-size: 180% 180%;
+  animation: db-map-flow 26s ease-in-out infinite alternate;
+}
+
+@keyframes db-map-flow {
+  0% { background-position: 0% 0%, 100% 0%, 100% 100%, 0% 100%, 0 0; }
+  50% { background-position: 40% 30%, 60% 20%, 70% 60%, 30% 70%, 0 0; }
+  100% { background-position: 100% 60%, 0% 50%, 20% 30%, 80% 20%, 0 0; }
+}
+
+.db-map-stage {
+  position: absolute;
+  inset: 0;
+}
+
+.db-map-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.db-map-svg.dragging {
+  cursor: grabbing;
+}
+
+/* 지도 파일의 칠은 인라인 style이라 !important로 덮는다 */
+
+/* 캠퍼스 경계 — 흰 면이 흐르는 배경 위에 떠 있는 느낌 */
+.db-map-boundary path,
+.db-map-boundary rect,
+.db-map-boundary polygon {
+  opacity: 1 !important;
+  fill: #e7ebf1 !important; /* 흰색은 눈부셔서 차분한 회청색으로(사용자 요청 2026-10-01) */
+  fill-opacity: 0.94 !important;
+  stroke: #b8c3d4 !important;
+  stroke-width: 2 !important;
+  filter: drop-shadow(0 10px 24px rgba(50, 64, 100, 0.22));
+}
+
+/* 바탕(도로·시험로·녹지) 선 */
+.db-map-base path,
+.db-map-base rect,
+.db-map-base circle,
+.db-map-base ellipse,
+.db-map-base polygon,
+.db-map-base polyline,
+.db-map-base line {
+  opacity: 1 !important;
+  stroke: #c2cbd8 !important;
+  stroke-width: 1 !important;
+}
+
+/* 채움 없던 닫힌 바탕 도형(트랙·도로) — 연한 회청색 면 */
+.db-map-base .db-map-road {
+  fill: #d8dee8 !important;
+  fill-opacity: 1 !important;
+}
+
+/* 녹지 — 파스텔 민트 */
+.db-map .db-map-green {
+  fill: #c9e6d4 !important;
+  fill-opacity: 0.9 !important;
+}
+
+.db-map-bld {
+  cursor: pointer;
+}
+
+/* 장비 없는 건물 */
+.db-map-bld.st-none {
+  fill: #f2f4f7 !important;
+  fill-opacity: 1 !important;
+  stroke: #c5cdd9 !important;
+  stroke-width: 1 !important;
+}
+
+.db-map-bld.st-none.db-map-green {
+  fill: #c9e6d4 !important;
+}
+
+.db-map-bld:not(.st-none) {
+  stroke: #fff !important;
+  stroke-width: 1.6 !important;
+}
+
+/* 경보·비상정지 — 깜빡임 + 붉은 빛 번짐 */
+.db-map-bld.st-alarm {
+  fill: #e0364d !important;
+  fill-opacity: 0.9 !important;
+  animation: db-map-alarm 1s ease-in-out infinite;
+}
+
+@keyframes db-map-alarm {
+  0%, 100% { fill-opacity: 0.92; filter: drop-shadow(0 0 0 rgba(224, 54, 77, 0)); }
+  50% { fill-opacity: 0.35; filter: drop-shadow(0 0 10px rgba(224, 54, 77, 0.95)); }
+}
+
+/* 통신오류 — 점선 테두리가 흐르고 은은하게 깜빡인다 */
+.db-map-bld.st-comm {
+  fill: #f79009 !important;
+  fill-opacity: 0.75 !important;
+  stroke: #b54708 !important;
+  stroke-width: 2 !important;
+  stroke-dasharray: 6 4;
+  animation: db-map-comm-dash 1.2s linear infinite, db-map-comm-fade 2.4s ease-in-out infinite;
+}
+
+@keyframes db-map-comm-dash {
+  to { stroke-dashoffset: -20; }
+}
+
+@keyframes db-map-comm-fade {
+  0%, 100% { fill-opacity: 0.8; }
+  50% { fill-opacity: 0.5; }
+}
+
+/* 운전 — 숨 쉬듯 초록 빛 */
+.db-map-bld.st-run {
+  fill: #12b76a !important;
+  fill-opacity: 0.78 !important;
+  animation: db-map-run 3s ease-in-out infinite;
+}
+
+@keyframes db-map-run {
+  0%, 100% { fill-opacity: 0.8; filter: drop-shadow(0 0 0 rgba(18, 183, 106, 0)); }
+  50% { fill-opacity: 0.62; filter: drop-shadow(0 0 7px rgba(18, 183, 106, 0.7)); }
+}
+
+/* 정지(idle) — 움직임 없음 */
+.db-map-bld.st-idle {
+  fill: #b4bccb !important;
+  fill-opacity: 0.85 !important;
+}
+
+.db-map-bld:not(.st-none):hover {
+  stroke: #4a5468 !important;
+  stroke-width: 2 !important;
+}
+
+.db-map-bld.sel {
+  stroke: var(--color-brand-navy) !important;
+  stroke-width: 3 !important;
+  stroke-dasharray: none !important;
+}
+
+/* 이름 — 작고 옅게, 장비가 있는 시설동만 조금 진하게 + 대수 */
+.db-map-lbl {
+  font-size: 10px;
+  font-weight: 600;
+  fill: #5b6578;
+  fill-opacity: 0.72;
+  letter-spacing: -0.02em;
+  text-anchor: middle;
+  pointer-events: none;
+}
+
+.db-map-lbl.has {
+  fill: #2c3445;
+  fill-opacity: 0.85;
+  font-weight: 700;
+}
+
+/* 건물번호 줄 */
+.db-map-lbl .no {
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: 0;
+  fill: #6a7489;
+}
+
+/* 방위 — 좌측 상단, 위쪽이 북 */
+.db-map-compass {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  width: 44px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(6px);
+  box-shadow: var(--shadow-card);
+  pointer-events: none;
+}
+
+.db-map-compass svg {
+  width: 30px;
+  height: 40px;
+}
+
+.db-map-compass text {
+  font-size: 12px;
+  font-weight: 800;
+  fill: #002c5f;
+}
+
+.db-map-compass .tip {
+  fill: #002c5f;
+}
+
+.db-map-compass .tail {
+  fill: #9aa6b8;
+}
+
+.db-map-zoom {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(6px);
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+}
+
+.db-map-zoom button {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text-sub);
+  cursor: pointer;
+}
+
+.db-map-zoom button + button {
+  border-top: 1px solid var(--color-border-soft);
+}
+
+.db-map-zoom button:hover {
+  background: rgba(242, 244, 247, 0.9);
+}
+
+.db-map-hint {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(6px);
+  font-size: 11.5px;
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+/* 시설동 팝업 — 호버로 열리고 클릭하면 고정(시안 mokup/dashboard_map_hover_v1) */
+.db-map-pop {
+  position: absolute;
+  z-index: 4; /* 툴팁(3)보다 위 — 열린 목록이 가려지지 않게 */
+  width: 340px;
+  max-height: calc(100% - 16px);
+  overflow: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.97);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 20px 44px -14px rgba(16, 24, 40, 0.45);
+  font-size: 13px;
+}
+
+.db-map-pop[hidden] {
+  display: none;
+}
+
+.db-map-pop-h {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px 10px;
+}
+
+.db-map-pop-h b {
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.db-map-pop-no {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--color-brand-navy);
+  font-size: 11.5px;
+  font-weight: 800;
+  color: #fff;
+}
+
+.db-map-pop-x {
+  margin-left: auto;
+  padding: 0 2px;
+  border: none;
+  background: none;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--color-text-faint);
+  cursor: pointer;
+}
+
+/* 상태별 대수 · 상태 태그 */
+.db-map-pop-sum {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 14px 10px;
+  border-bottom: 1px solid var(--color-border-soft);
+}
+
+.db-map-pop-sum span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.db-map-pop-sum i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.db-map-pop .s-alarm { background: #fff0f1; color: #e0364d; }
+.db-map-pop .s-comm { background: #fff6ed; color: #b54708; }
+.db-map-pop .s-run { background: #eafaf3; color: #0f9467; }
+.db-map-pop .s-idle { background: #f1f3f7; color: #6a7489; }
+.db-map-pop .s-off { background: #fff; color: #8a93a6; box-shadow: inset 0 0 0 1px #c7cedb; }
+
+.db-map-pop ul {
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+}
+
+.db-map-pop li {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto 12px;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.db-map-pop li:hover {
+  background: #f3f6ff;
+}
+
+.db-map-pop li .d {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.db-map-pop .d.c-alarm { background: #e0364d; }
+.db-map-pop .d.c-comm { background: #f79009; }
+.db-map-pop .d.c-run { background: #12b76a; }
+.db-map-pop .d.c-idle { background: #98a2b3; }
+.db-map-pop .d.c-off { background: #fff; box-shadow: inset 0 0 0 1.5px #b4bccb; }
+
+.db-map-pop li .nm b {
+  display: block;
+  overflow: hidden;
+  font-weight: 700;
+  color: var(--color-text);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.db-map-pop li .nm small {
+  display: block;
+  margin-top: 1px;
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.db-map-pop li .tags {
+  display: flex;
+  gap: 4px;
+}
+
+.db-map-pop li .t {
+  padding: 1px 7px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.db-map-pop li .chev {
+  font-size: 14px;
+  color: var(--color-text-faint);
+}
+
+/* 운영 외 장비(미운영·수리중 …) — 흐리게 */
+.db-map-pop li.off .nm b {
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.db-map-pop-f {
+  padding: 8px 14px 10px;
+  border-top: 1px solid var(--color-border-soft);
+  font-size: 11.5px;
+  color: var(--color-text-muted);
+}
+
+.db-map-pop-empty {
+  margin: 0;
+  padding: 2px 14px 14px;
+  font-size: 12.5px;
+  color: var(--color-text-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .db-map-stagewrap,
+  .db-map-bld,
+  .db-map-legend i {
+    animation: none !important;
+  }
+}
+
+/* 상태 색이 칠해진 시설동 위에서는 번호 줄도 진하게(옅으면 색 면에 묻힌다) */
+.db-map-lbl.has .no {
+  fill: #2c3445;
+  fill-opacity: 0.75;
+}
+
+/* 시설동 툴팁 — 마우스를 따라다니며 건물번호 + 시설동명(누를 수 없음) */
+.db-map-tip {
+  position: absolute;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 6px;
+  max-width: 260px;
+  padding: 6px 10px;
+  border-radius: 9px;
+  background: rgba(23, 32, 51, 0.88);
+  box-shadow: 0 8px 20px -8px rgba(16, 24, 40, 0.5);
+  font-size: 12.5px;
+  color: #fff;
+  pointer-events: none;
+}
+
+.db-map-tip[hidden] {
+  display: none;
+}
+
+.db-map-tip .no {
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.18);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.db-map-tip b {
+  font-weight: 700;
+}
+
+.db-map-tip small {
+  flex-basis: 100%;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.7);
+}

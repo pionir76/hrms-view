@@ -23,8 +23,8 @@
           <button type="button" class="db-mode-btn active" data-mode="list" role="tab" aria-selected="true">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" /></svg>리스트
           </button>
-          <button type="button" class="db-mode-btn" data-mode="map" role="tab" aria-selected="false" disabled title="맵 모드는 준비 중입니다">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14" /></svg>맵<em>준비 중</em>
+          <button type="button" class="db-mode-btn" data-mode="map" role="tab" aria-selected="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14" /></svg>맵
           </button>
         </div>
         <!-- 시스템 정보·서버 상태 패널 열기/닫기 — 닫혀 있어도 점 색으로 서버 상태를 알 수 있게 한다 -->
@@ -72,6 +72,42 @@
             </div>
             <div class="db-regions" id="dbRegions">
               <div class="empty-state">불러오는 중...</div>
+            </div>
+          </div>
+
+          <!-- 맵 모드 — 시설동을 소속 장비 상태로 칠한다(dashboard-map.js, 시안 mokup/dashboard_map_v2). 리스트 모드에서는 숨긴다 -->
+          <div class="db-card db-map" id="dbMap">
+            <div class="db-map-main">
+              <div class="db-map-bar">
+                <h2 class="db-list-title">장비 맵</h2>
+                <div class="db-map-tabs" id="dbMapTabs"></div>
+                <div class="db-map-legend">
+                  <span><i class="c-alarm"></i>경보·비상정지</span>
+                  <span><i class="c-comm"></i>통신오류</span>
+                  <span><i class="c-run"></i>운전</span>
+                  <span><i class="c-idle"></i>정지</span>
+                  <span><i class="c-none"></i>장비 없음</span>
+                </div>
+              </div>
+              <div class="db-map-stagewrap">
+                <div class="db-map-stage" id="dbMapStage"><div class="empty-state">지도를 불러오는 중...</div></div>
+                <!-- 방위 — 지도 위쪽이 북 -->
+                <div class="db-map-compass" aria-label="위쪽이 북쪽">
+                  <svg viewBox="0 0 40 52" aria-hidden="true">
+                    <text x="20" y="11" text-anchor="middle">N</text>
+                    <path class="tip" d="M20 16 L27 41 L20 36 Z" />
+                    <path class="tail" d="M20 16 L13 41 L20 36 Z" />
+                  </svg>
+                </div>
+                <div class="db-map-zoom">
+                  <button type="button" id="dbMapZoomIn" aria-label="확대">+</button>
+                  <button type="button" id="dbMapZoomOut" aria-label="축소">−</button>
+                  <button type="button" id="dbMapFit" aria-label="지구에 맞추기" title="지구에 맞추기">⤢</button>
+                </div>
+                <div class="db-map-hint">휠: 확대/축소 · 드래그: 이동 · 시설동을 누르면 장비 목록</div>
+                <div class="db-map-tip" id="dbMapTip" hidden></div>
+                <div class="db-map-pop" id="dbMapPopup" hidden></div>
+              </div>
             </div>
           </div>
         </div>
@@ -178,6 +214,7 @@
   <script src="../../common/js/ui.js"></script>
   <script src="../../common/js/event-log.js"></script>
   <script src="dashboard.js"></script>
+  <script src="dashboard-map.js"></script>
   <script>
     requireAuth();
     renderLayout();

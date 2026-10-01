@@ -94,6 +94,7 @@ function initDashboard() {
   });
 
   document.getElementById("dbSysToggle").addEventListener("click", toggleSystemPanel);
+  initDashboardMap(); // 리스트 / 맵 전환과 맵 조작(dashboard-map.js)
 
   loadEquipments();
   setInterval(loadEquipments, EQUIPMENT_POLL_MS);
@@ -125,6 +126,7 @@ async function loadEquipments() {
   renderKpis();
   renderFilters();
   renderEquipmentList(false);
+  renderDashboardMap(); // 맵 모드를 보고 있을 때만 다시 칠한다
   renderLiveBadge();
 }
 
