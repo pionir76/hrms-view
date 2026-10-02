@@ -1,9 +1,19 @@
 /* HRMS 공통 스타일 - 레이아웃 및 기본 요소 */
 
-/* Pretendard — 한글/영문/숫자 모두 깔끔하게 나오는 시스템 공통 폰트.
-   CDN 로드가 안 되는 폐쇄망 환경이면 자동으로 Malgun Gothic 등 OS 기본 글꼴로
-   대체되므로(font-family 폴백), 오프라인이어도 깨지지 않는다. */
-@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css");
+/* Pretendard — 한글/영문/숫자 모두 깔끔하게 나오는 시스템 공통 폰트(v1.3.9, OFL 라이선스 —
+   assets/fonts/Pretendard-LICENSE.txt).
+   납품 현장(남양연구소)이 폐쇄망이라 인터넷(CDN)에서 받지 않고 프로젝트 안의 파일을 쓴다(2026-10-02).
+   예전처럼 CDN을 @import하면 폐쇄망에서 글꼴이 맑은 고딕으로 바뀌어 표·PDF 줄바꿈이 달라지고,
+   연결이 막힌 채 응답이 없으면 브라우저가 포기할 때까지 화면 전체가 하얗게 멈출 수 있다.
+   가변(variable) 글꼴 한 파일이 쓰는 굵기(400~800)를 모두 담는다. */
+@font-face {
+  font-family: "Pretendard";
+  src: url("../../assets/fonts/PretendardVariable.woff2") format("woff2-variations"),
+    url("../../assets/fonts/PretendardVariable.woff2") format("woff2");
+  font-weight: 45 920;
+  font-style: normal;
+  font-display: swap;
+}
 
 /* 디자인 토큰 (2026-09-17 앱 전체 개편 — 자료 조회 화면 디자인을 전 화면으로 확장)
    옅은 파랑·보라 그라데이션 배경 위에 흰 카드(둥근 모서리 + 부드러운 그림자),

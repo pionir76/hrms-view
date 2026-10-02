@@ -13,7 +13,7 @@
 ### 참고 사항
 
 - 백엔드 기능 명세 및 업데이트 사항은 항상 [`reference/`](reference/) 폴더를 확인합니다 ([api-manual.md](reference/api-manual.md)). `reference/`는 백엔드가 통째로 갱신해 주는 자료라 git에서 관리하지 않는다.
-- **배포**: 빌드 과정이 없어 이 폴더(`index.html`, `pages/`, `common/`, `assets/`)를 그대로 백엔드에 전달한다(`mokup/`·`README.md`·`TODO.md`·`reference/`는 제외). 현장은 백엔드가 화면과 API를 같은 주소(`http://59.16.212.237/`)로 서비스한다. API 주소는 `common/js/config.js`가 **화면을 연 주소를 보고 자동으로** 고른다 — 개발 PC(로컬 파일·localhost·127.0.0.1)면 `https://localhost:7253`, 그 밖이면 상대 경로(`/api/...`)(2026-10-02).
+- **배포**: 빌드 과정이 없다. 이 폴더에서 `.make-deploy.ps1`(PowerShell)을 실행하면 상위 폴더의 `deploy`에 화면에 필요한 파일(`index.html`, `pages/`, `common/`, `assets/`)만 담긴 전달용 폴더가 만들어진다(`mokup/`·`README.md`·`TODO.md`·`reference/`는 빠짐 — 서버에 올리면 누구나 열람 가능해서). 그 내용을 서버의 wwwroot에 덮어쓴다. 백엔드가 화면과 API를 같은 주소로 서비스하고, API 주소는 `common/js/config.js`가 **화면을 연 주소를 보고 자동으로** 고른다 — 개발 PC(로컬 파일·localhost·127.0.0.1, Live Server 포함)면 `http://localhost:80`, 그 밖(테스트 서버 `http://59.16.212.237/`, 납품 현장 폐쇄망)이면 상대 경로(`/api/...`)라 **IP가 바뀌어도 고칠 것이 없다**. 글꼴(Pretendard)은 폐쇄망 대비 `assets/fonts/`에 넣어 인터넷 없이 동작한다(2026-10-02).
 - 이 문서와 `reference/` 문서의 내용이 서로 어긋나는 부분이 있으면, 화면 구현 전에 먼저 맞춰봐야 합니다 (하단 [11. 확인이 필요한 부분](#11-확인이-필요한-부분) 참고).
 
 ---
