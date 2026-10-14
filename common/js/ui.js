@@ -280,3 +280,16 @@ async function fetchEquipmentOperatingStatus(equipmentId, fallback) {
     return fallback || "";
   }
 }
+
+// ---------- 창(모달) 닫기 공통 규칙 (2026-10-12) ----------
+//
+// 문서 창은 바깥(어두운 배경)을 눌러도 닫히지 않는다 — 실수로 누르거나, 입력칸에서 글자를 드래그하다
+// 창 밖에서 손을 떼면 브라우저가 그걸 "바깥 클릭"으로 처리해 입력 중인 창이 닫혀 버렸다.
+// 닫기·× 버튼과 Esc로만 닫는다(교육훈련 일지와 같은 구조).
+//
+// Esc는 맨 위 창 하나만 닫아야 한다. 상단바의 결재 알림(일괄 결재) 창은 어느 화면에서나 열려
+// 그 화면의 문서 창 위에 겹칠 수 있으므로, 그 창이 열려 있으면 화면 쪽 Esc 처리는 건너뛴다.
+function isApprovalInboxOpen() {
+  const modal = document.getElementById("approvalInboxModal");
+  return !!modal && !modal.hidden;
+}

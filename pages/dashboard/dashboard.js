@@ -68,11 +68,11 @@ function initDashboard() {
   });
   document.getElementById("dbRegions").addEventListener("click", (event) => {
     const row = event.target.closest("[data-equipment-id]");
-    if (row) window.location.href = `equipment-detail.html?id=${row.dataset.equipmentId}`;
+    if (row) window.location.href = `equipment-detail.html?id=${row.dataset.equipmentId}&from=list`;
   });
   document.getElementById("dbRegions").addEventListener("keydown", (event) => {
     const row = event.target.closest("[data-equipment-id]");
-    if (row && event.key === "Enter") window.location.href = `equipment-detail.html?id=${row.dataset.equipmentId}`;
+    if (row && event.key === "Enter") window.location.href = `equipment-detail.html?id=${row.dataset.equipmentId}&from=list`;
   });
 
   document.getElementById("dbTickerToggle").addEventListener("click", toggleEventsPanel);
@@ -268,11 +268,33 @@ function renderEquipmentList(force) {
   });
 }
 
+// 압축기 램프 — 압축기마다 순번 칸 하나, 통신·경보 상태로 색을 입힌다(사용자 결정 2026-10-12,
+// 시안 mokup/dashboard_lamps_v1). 예전엔 압축기 수량만 회색 사각에 표시했다.
+//   경보 → 빨강 / 통신 끊김·재접속중 → 주황(이때 서버가 hasAlarm을 항상 false로 줘서 경보 여부를 모른다) / 정상 → 회청색
+// 압축기별 운전 정보는 없으므로(운전은 장비 단위 isRunning) 정상을 초록으로 칠하지 않는다.
+// 좁은 화면에서는 숫자 없는 점으로 줄어든다(dashboard.css). 맵 팝업(dashboard-map.js)도 같은 램프를 쓴다.
+function compressorLampState(c) {
+  if (c.communicationStatus !== "연결됨") return "comm";
+  if (c.hasAlarm) return "alarm";
+  return "ok";
+}
+
+const COMPRESSOR_LAMP_TEXT = { comm: "통신 끊김 — 경보 여부 알 수 없음", alarm: "경보", ok: "정상" };
+
+function compressorLampsHtml(e) {
+  const list = (e.compressors || []).slice().sort((a, b) => a.sequenceNo - b.sequenceNo);
+  if (list.length === 0) return `<span class="db-lamps" title="압축기 없음"></span>`;
+  return `<span class="db-lamps">${list
+    .map((c) => {
+      const st = compressorLampState(c);
+      return `<span class="db-lamp${st === "ok" ? "" : ` ${st}`}" title="#${c.sequenceNo} ${COMPRESSOR_LAMP_TEXT[st]}">${c.sequenceNo}</span>`;
+    })
+    .join("")}</span>`;
+}
+
 function equipmentRowHtml(e) {
   const comm = isCommFail(e);
   const dotClass = comm ? "d-comm" : e.isRunning ? "d-run run" : "d-stop";
-  // 압축기는 수량만 회색 사각에 표시(번호·상태 색 없음 — 사용자 결정 2026-09-17)
-  const compressorCount = (e.compressors || []).length;
   // 통신이 끊기면 백엔드가 hasAlarm을 항상 false로 내린다(백엔드 변경 2026-09-28) — "경보 없음"이
   // 아니라 "알 수 없음"이므로, 경보 배지를 꺼진 모양 그대로 두지 않고 흐리게 구분한다.
   const alarmUnknown = comm;
@@ -291,7 +313,7 @@ function equipmentRowHtml(e) {
       <span class="db-dot ${dotClass}"></span>
       <span class="db-eq-name">${escapeHtml(e.name)}</span>
       ${emergency ? `<span class="db-emg">비상정지</span>` : ""}
-      <span class="db-comp" title="압축기 ${compressorCount}대">${compressorCount}</span>
+      ${compressorLampsHtml(e)}
       <span class="db-onoff comm${comm ? " on" : ""}">통신</span>
       <span class="db-onoff alarm${e.hasAlarm ? " on" : ""}${alarmUnknown ? " unknown" : ""}"${
         alarmUnknown ? ' title="통신이 끊겨 경보 여부를 알 수 없습니다"' : ""

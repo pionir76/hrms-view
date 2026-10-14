@@ -135,15 +135,15 @@ async function initOperationPage() {
   document.getElementById("yearSelect").addEventListener("change", onYearMonthChange);
   document.getElementById("monthSelect").addEventListener("change", onYearMonthChange);
 
+  // 창은 닫기·× 버튼과 Esc로만 닫는다 — 바깥 클릭으로는 닫지 않는다(ui.js "창 닫기 공통 규칙")
   document.getElementById("modalCloseX").addEventListener("click", closeOperationModal);
-  document.getElementById("operationModal").addEventListener("click", (event) => {
-    if (event.target.id === "operationModal") closeOperationModal();
-  });
-
   document.getElementById("refEditCancelBtn").addEventListener("click", closeRefEditModal);
   document.getElementById("refEditSaveBtn").addEventListener("click", saveRefEdit);
-  document.getElementById("refEditModal").addEventListener("click", (event) => {
-    if (event.target.id === "refEditModal") closeRefEditModal();
+  // Esc는 맨 위 창 하나만 — 실측 기준 수정 창이 운전일지 창 위에 뜬다
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape" || isApprovalInboxOpen()) return;
+    if (!document.getElementById("refEditModal").hidden) closeRefEditModal();
+    else if (!document.getElementById("operationModal").hidden) closeOperationModal();
   });
 
   document.getElementById("prevMonthBtn").addEventListener("click", () => changeMonth(-1));

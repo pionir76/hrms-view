@@ -65,14 +65,20 @@ function isViewingToday() {
   return state.date === todayDateString();
 }
 
-// 실시간 현황 맵에서 들어왔으면(from=map) "실시간 현황으로"가 맵 모드·보던 지구로 돌아가게 한다
+// "실시간 현황으로"가 들어온 보기로 돌아가게 한다 — 리스트에서 왔으면(from=list) 리스트로, 맵에서 왔으면
+// (from=map) 맵 모드·보던 지구로. 표시가 없으면 실시간 현황 기본 보기(맵)로 간다.
 function setupBackLink() {
   const params = new URLSearchParams(window.location.search);
+  const link = document.querySelector(".back-link");
+  if (params.get("from") === "list") {
+    link.href = "dashboard.html?mode=list";
+    return;
+  }
   if (params.get("from") !== "map") return;
   const back = new URLSearchParams({ mode: "map" });
   const tab = params.get("tab");
   if (tab && /^(all|[A-Z])$/.test(tab)) back.set("tab", tab);
-  document.querySelector(".back-link").href = `dashboard.html?${back}`;
+  link.href = `dashboard.html?${back}`;
 }
 
 async function initEquipmentDetail() {

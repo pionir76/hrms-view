@@ -958,20 +958,53 @@ body.page-dashboard {
   white-space: nowrap;
 }
 
-/* 압축기 수량 배지 — 회색 사각에 수량만(색 변경 없음 — 사용자 결정) */
-.db-comp {
+/* 압축기 램프 — 압축기마다 순번 칸, 통신·경보 상태로 색(dashboard.js compressorLampsHtml, 시안 mokup/dashboard_lamps_v1).
+   정상은 회청색 — 압축기별 운전 정보가 없어 초록(운전으로 오해)을 쓰지 않는다. */
+.db-lamps {
   flex-shrink: 0;
-  min-width: 18px;
-  padding: 0 4px;
-  height: 18px;
-  border-radius: 5px;
+  display: inline-flex;
+  gap: 3px;
+}
+
+.db-lamp {
+  width: 17px;
+  height: 17px;
   display: grid;
   place-items: center;
-  background: #f1f3f7;
-  color: #8a93a6;
-  font-size: 10px;
+  border-radius: 4px;
+  background: #eaeef4;
+  box-shadow: inset 0 0 0 1px #d4dbe6;
+  font-size: 9.5px;
   font-weight: 800;
+  color: #8a93a6;
   font-variant-numeric: tabular-nums;
+}
+
+.db-lamp.alarm {
+  background: #e0364d;
+  box-shadow: none;
+  color: #fff;
+}
+
+.db-lamp.comm {
+  background: #f79009;
+  box-shadow: none;
+  color: #fff;
+}
+
+/* 좁은 화면(1366 등) — 숫자 없는 점으로 줄여 장비명 자리를 지킨다(맵 팝업은 그대로) */
+@media (max-width: 1440px) {
+  .db-eq .db-lamp {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    font-size: 0;
+  }
+}
+
+/* 맵 팝업 — 장비 이름 아래 줄에 램프 */
+.db-map-pop li .nm .db-lamps {
+  margin-top: 4px;
 }
 
 /* 통신·경보 on/off 배지 — 항상 표시, 해당 없으면 옅은 테두리만 */
@@ -1285,7 +1318,7 @@ body.page-dashboard {
   .db-storage { gap: 16px; }
   .db-kpi { gap: 14px; padding: 16px; }
   .db-search { width: 180px; }
-  /* 압축기 번호 배지를 점으로 줄여 장비명 자리를 확보한다 */
+  /* 통신·경보 배지를 좁혀 장비명 자리를 확보한다(압축기 램프는 1440px 이하에서 점으로 — 위 .db-lamp) */
   .db-onoff { width: 32px; font-size: 10px; }
   .db-eq { gap: 7px; padding: 6px 6px; }
   .db-region-head { padding: 9px 12px; gap: 8px; }

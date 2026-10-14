@@ -102,9 +102,6 @@ function ensureApprovalModal() {
 
   modal.querySelector("#apCloseX").addEventListener("click", closeApprovalInbox);
   modal.querySelector("#apCloseBtn").addEventListener("click", closeApprovalInbox);
-  modal.addEventListener("click", (event) => {
-    if (event.target === modal) closeApprovalInbox();
-  });
   modal.querySelector("#apGroups").addEventListener("click", (event) => {
     const item = event.target.closest("[data-doc-type]");
     if (item) selectApprovalGroup(item.dataset.docType);
@@ -115,6 +112,8 @@ function ensureApprovalModal() {
   });
   modal.querySelector("#apSelectAll").addEventListener("click", toggleApprovalSelectAll);
   modal.querySelector("#apApproveBtn").addEventListener("click", submitApprovalBulk);
+  // 닫기·× 버튼과 Esc로만 닫는다 — 바깥 클릭으로는 닫지 않는다(ui.js "창 닫기 공통 규칙").
+  // 이 창은 다른 화면의 문서 창 위에 겹칠 수 있어, 화면 쪽 Esc 처리는 isApprovalInboxOpen()으로 이 창이 열려 있으면 건너뛴다.
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && !modal.hidden) closeApprovalInbox();
   });

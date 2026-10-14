@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>가동율 - HRMS</title>
+  <link rel="stylesheet" href="../../common/css/common.css" />
+  <link rel="stylesheet" href="utilization.css" />
+  <link rel="stylesheet" href="../../common/css/pdf-export.css" />
+</head>
+<body data-page="utilization">
+  <div class="app-shell">
+    <header class="topbar" id="topbar"></header>
+    <main class="content content-narrow" id="content">
+      <div class="page-header page-header-row">
+        <div>
+          <span class="page-eyebrow">Utilization</span>
+          <h1>가동율</h1>
+          <p>하루 또는 한 달 동안 운영 장비 전체의 가동율(운전한 시간 ÷ 기록된 시간)을 보여줍니다.</p>
+        </div>
+        <span class="page-header-badge">조회 전용</span>
+      </div>
+
+      <!-- 조회 조건: 일별/월별 전환 + 날짜(또는 월) + 이전/다음 — 바꾸면 바로 다시 불러온다 -->
+      <div class="panel ut-filter">
+        <div class="segmented" id="utMode" role="tablist" aria-label="조회 단위">
+          <button type="button" class="segmented-btn active" data-mode="day" role="tab" aria-selected="true">일별</button>
+          <button type="button" class="segmented-btn" data-mode="month" role="tab" aria-selected="false">월별</button>
+        </div>
+        <div class="ut-period">
+          <button type="button" class="btn btn-secondary ut-nav" id="utPrev" aria-label="이전">◀</button>
+          <input type="date" id="utDate" aria-label="조회 날짜" />
+          <input type="month" id="utMonth" aria-label="조회 월" hidden />
+          <button type="button" class="btn btn-secondary ut-nav" id="utNext" aria-label="다음">▶</button>
+        </div>
+        <input type="search" class="ut-search" id="utSearch" placeholder="장비명·시설동·지구 검색" />
+        <span class="ut-status" id="utStatus"></span>
+        <button type="button" class="btn btn-secondary" id="utPdfBtn" disabled title="불러오기가 끝나면 저장할 수 있습니다">PDF 저장</button>
+      </div>
+
+      <!-- 요약 -->
+      <div class="ut-summary" id="utSummary" hidden>
+        <div class="ut-sum-item"><span>평균 가동율</span><b id="utAvg">-</b></div>
+        <div class="ut-sum-item"><span>조회 장비</span><b id="utCount">-</b></div>
+        <div class="ut-sum-item"><span>기록 없음</span><b id="utNoData">-</b></div>
+        <div class="ut-sum-note" id="utSumNote"></div>
+      </div>
+
+      <div class="panel ut-table-panel">
+        <!-- 표 영역만 화면 높이에 맞춰 스크롤(머리글 고정) -->
+        <div class="ut-scroll">
+          <table class="data-table ut-table">
+            <colgroup>
+              <col style="width: 70px" />
+              <col style="width: 180px" />
+              <col />
+              <col style="width: 220px" />
+              <col style="width: 110px" />
+              <col style="width: 110px" />
+              <col style="width: 90px" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>지구</th>
+                <th>시설동</th>
+                <th>장비명</th>
+                <th class="sortable" data-sort="percent">가동율 <i id="utSortIcon">↓</i></th>
+                <th class="num">운전 시간</th>
+                <th class="num">기록 시간</th>
+                <th class="num" title="기록 시간 ÷ 조회 기간(오늘·이번 달은 지금까지)">기록률</th>
+              </tr>
+            </thead>
+            <tbody id="utBody">
+              <tr><td colspan="7"><div class="empty-state">불러오는 중...</div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="../../common/js/config.js"></script>
+  <script src="../../common/js/auth.js"></script>
+  <script src="../../common/js/api.js"></script>
+  <script src="../../common/js/ui.js"></script>
+  <script src="../../common/js/approval-inbox.js"></script>
+  <script src="../../common/js/layout.js"></script>
+  <script src="../../common/js/pdf-export.js"></script>
+  <script src="utilization.js"></script>
+  <script>
+    requireAuth();
+    renderLayout();
+  </script>
+</body>
+</html>

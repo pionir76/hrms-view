@@ -98,13 +98,13 @@ function initDashboardMap() {
     if (event.key === "Escape" && mapState.selectedKey) hideMapPopupNow();
   });
 
-  // 주소에 맵 상태가 있으면 그대로 연다 — 장비 실시간 화면의 "실시간 현황으로"·브라우저 뒤로 가기로 돌아왔을 때
+  // 처음 보기는 맵 모드(사용자 결정 2026-10-14 — 로그인 직후·메뉴로 들어와도 맵).
+  // 주소에 ?mode=list가 있으면 리스트로 연다 — 리스트에서 장비 화면에 갔다가 "실시간 현황으로"·
+  // 뒤로 가기로 돌아왔을 때. 맵이면 보던 지구(?tab=)도 이어서 연다.
   const params = new URLSearchParams(window.location.search);
-  if (params.get("mode") === "map") {
-    const tab = params.get("tab");
-    if (tab && /^(all|[A-Z])$/.test(tab)) mapState.tab = tab;
-    setDashboardMode("map");
-  }
+  const tab = params.get("tab");
+  if (tab && /^(all|[A-Z])$/.test(tab)) mapState.tab = tab;
+  setDashboardMode(params.get("mode") === "list" ? "list" : "map");
 }
 
 // 지금 보기(리스트 / 맵 + 지구 탭)를 주소에 남긴다 — 새로고침·뒤로 가기에도 같은 보기로 돌아오게(히스토리는 늘리지 않음)
@@ -114,7 +114,7 @@ function syncDashboardUrl() {
     url.searchParams.set("mode", "map");
     url.searchParams.set("tab", mapState.tab);
   } else {
-    url.searchParams.delete("mode");
+    url.searchParams.set("mode", "list"); // 기본이 맵이라 리스트는 주소에 남겨야 돌아올 때 리스트로 열린다
     url.searchParams.delete("tab");
   }
   window.history.replaceState(null, "", url);
@@ -424,7 +424,7 @@ function wireMapInteraction() {
 // ---------- 시설동 툴팁(호버) · 장비 목록 팝업(클릭) ----------
 //
 // 머리: 건물번호(지도 라벨) + 시설동 이름 / 요약: 상태별 대수(0은 숨김) / 목록: 장비마다 상태 점·이름·
-// 압축기 수·상태 태그. 운영이 아닌 장비(미운영·수리중 …)는 맨 아래에 흐리게, 운영 상태만 회색 태그로.
+// 압축기 램프(리스트와 같은 compressorLampsHtml)·상태 태그. 운영이 아닌 장비(미운영·수리중 …)는 맨 아래에 흐리게, 운영 상태만 회색 태그로.
 // 장비 행을 누르면 장비 실시간 화면으로 이동한다.
 
 function showMapTip(key, event) {
@@ -513,11 +513,10 @@ function renderMapPopup() {
   const rows = [
     ...items.map((e) => {
       const st = equipmentMapState(e);
-      const comp = (e.compressors || []).length;
       return `
         <li data-equipment-id="${e.id}">
           <span class="d c-${st}"></span>
-          <span class="nm"><b>${escapeHtml(e.name)}</b>${comp ? `<small>압축기 ${comp}대</small>` : ""}</span>
+          <span class="nm"><b>${escapeHtml(e.name)}</b>${compressorLampsHtml(e)}</span>
           <span class="tags">${equipmentStateTags(e).map(([k, t]) => `<span class="t s-${k}">${t}</span>`).join("")}</span>
           <span class="chev" aria-hidden="true">›</span>
         </li>`;

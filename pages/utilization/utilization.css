@@ -1,0 +1,237 @@
+/* 가동율 페이지 전용 스타일 (utilization.js) */
+
+/* 조회 조건 — 일별/월별 · 날짜(월) · 이전/다음 · 진행 상황 */
+.ut-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 12px 16px;
+}
+
+.ut-period {
+  display: flex;
+  align-items: center;
+  height: 38px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-field-bg, #fff);
+  overflow: hidden;
+}
+
+.ut-period:focus-within {
+  border-color: var(--color-primary);
+}
+
+.ut-period input[type="date"],
+.ut-period input[type="month"] {
+  height: 36px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.ut-period input[hidden] {
+  display: none;
+}
+
+.ut-nav {
+  height: 36px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  font-size: 11px;
+}
+
+.ut-status {
+  margin-left: auto;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.ut-status.error {
+  color: #e0364d;
+}
+
+/* 요약 */
+.ut-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 26px;
+  margin-bottom: 14px;
+  padding: 12px 18px;
+  border-radius: var(--radius-lg);
+  background: #fff;
+  box-shadow: var(--shadow-card);
+}
+
+.ut-summary[hidden] {
+  display: none;
+}
+
+.ut-sum-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.ut-sum-item span {
+  font-size: 12.5px;
+  color: var(--color-text-muted);
+}
+
+.ut-sum-item b {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.ut-sum-item b small {
+  margin-left: 2px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
+.ut-sum-note {
+  margin-left: auto;
+  font-size: 11.5px;
+  color: var(--color-text-muted);
+}
+
+/* 표 */
+.ut-table-panel {
+  padding: 0;
+}
+
+.ut-table {
+  table-layout: fixed;
+}
+
+.ut-table th.num,
+.ut-table td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ut-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.ut-table th.sortable:hover {
+  color: var(--color-primary);
+}
+
+.ut-table th.sortable i {
+  font-style: normal;
+  margin-left: 2px;
+}
+
+.ut-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 가동율 막대 + 수치 */
+.ut-rate {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ut-bar {
+  flex: 1;
+  height: 8px;
+  border-radius: 99px;
+  background: #eef1f6;
+  overflow: hidden;
+}
+
+.ut-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #2cc9a0, #0f9483);
+}
+
+.ut-rate b {
+  min-width: 52px;
+  text-align: right;
+  font-size: 13.5px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.ut-rate b small {
+  margin-left: 1px;
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.ut-muted {
+  font-size: 12.5px;
+  color: var(--color-text-faint);
+}
+
+.ut-fail {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #e0364d;
+}
+
+/* 기록률 90% 미만 — 서버가 꺼져 있던 시간이 있었다 */
+.ut-low {
+  font-weight: 700;
+  color: #b54708;
+}
+
+/* 검색 */
+.ut-search {
+  width: 220px;
+  height: 38px;
+}
+
+/* 표 영역 — 화면 높이에 맞춰 이 안에서만 스크롤, 머리글은 위에 고정 */
+.ut-scroll {
+  max-height: calc(100vh - 360px);
+  min-height: 260px;
+  overflow: auto;
+}
+
+.ut-scroll .ut-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #fafbfc;
+  box-shadow: inset 0 -1px 0 var(--color-border);
+}
+
+/* PDF 표 — A4 세로(680px)에 7칸, 글자를 조금 줄인다 */
+.pdf-table.ut-pdf-table th {
+  padding: 5px 6px;
+  font-size: 10.5px;
+}
+
+.pdf-table.ut-pdf-table td {
+  padding: 4px 6px;
+  font-size: 11px;
+  vertical-align: middle;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pdf-table.ut-pdf-table td.ut-pdf-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}

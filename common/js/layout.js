@@ -15,6 +15,7 @@
 const MENU = [
   { id: "dashboard", label: "실시간 현황", href: "../dashboard/dashboard.html" },
   { id: "trend", label: "자료 조회", href: "../trend/trend.html" },
+  { id: "utilization", label: "가동율", href: "../utilization/utilization.html" },
   { id: "notice", label: "공지사항", href: "../notice/notice.html" },
   { id: "org", label: "조직 관리", href: "../org/org.html" },
   { id: "equipment", label: "장비 관리", href: "../equipment/equipment.html" },

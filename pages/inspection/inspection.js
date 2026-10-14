@@ -54,9 +54,11 @@ async function initInspectionPage() {
   document.getElementById("yearSelect").addEventListener("change", onYearMonthChange);
   document.getElementById("monthSelect").addEventListener("change", onYearMonthChange);
 
+  // 창은 닫기·× 버튼과 Esc로만 닫는다 — 바깥 클릭으로는 닫지 않는다(ui.js "창 닫기 공통 규칙")
   document.getElementById("modalCloseX").addEventListener("click", closeInspectionModal);
-  document.getElementById("inspectionModal").addEventListener("click", (event) => {
-    if (event.target.id === "inspectionModal") closeInspectionModal();
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape" || isApprovalInboxOpen()) return;
+    if (!document.getElementById("inspectionModal").hidden) closeInspectionModal();
   });
 
   document.getElementById("prevMonthBtn").addEventListener("click", () => changeMonth(-1));

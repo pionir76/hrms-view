@@ -60,7 +60,7 @@ function initTrainingPage() {
   });
 
   document.addEventListener("keydown", (event) => {
-    if (event.key !== "Escape") return;
+    if (event.key !== "Escape" || isApprovalInboxOpen()) return; // 결재 알림 창이 위에 있으면 그 창만 닫힌다
     if (!document.getElementById("trainingModal").hidden) closeTrainingModal();
   });
 
