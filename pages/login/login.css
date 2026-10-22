@@ -1,69 +1,112 @@
-/* 로그인 화면 전용 스타일 */
+/* 로그인 화면 전용 스타일
+   앱 전체와 같은 밝은 톤(2026-10-22) — 옅은 파랑·보라 배경 위에 흰 카드, 제목은 현대 네이비,
+   강조색은 공통 토큰(--accent-grad)의 파랑→보라 그라데이션. 예전 짙은 남색 배경은 앱 화면과 동떨어져 바꿨다. */
 
 .login-shell {
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(160deg, #0f1c3f 0%, #10192e 55%, #0b1224 100%);
+  padding: 24px 16px;
+  background:
+    radial-gradient(40% 50% at 15% 15%, rgba(120, 160, 255, 0.22), transparent 70%),
+    radial-gradient(38% 48% at 88% 20%, rgba(160, 130, 255, 0.18), transparent 70%),
+    radial-gradient(45% 55% at 75% 92%, rgba(110, 210, 190, 0.16), transparent 70%),
+    var(--color-bg);
 }
 
 .login-card {
-  width: 360px;
-  max-width: calc(100vw - 32px);
+  position: relative;
+  width: 380px;
+  max-width: 100%;
+  overflow: hidden;
+  padding: 36px 32px 26px;
+  border: 1px solid rgba(228, 232, 240, 0.9);
+  border-radius: var(--radius-lg);
   background: var(--color-surface);
-  border-radius: var(--radius-md);
-  box-shadow: 0 20px 48px rgba(8, 14, 30, 0.35);
-  padding: 32px 28px 26px;
+  box-shadow: 0 1px 2px rgba(20, 32, 60, 0.05), 0 24px 56px -20px rgba(30, 50, 110, 0.28);
+}
+
+/* 카드 위쪽의 얇은 강조 띠 */
+.login-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 4px;
+  background: var(--accent-grad);
 }
 
 .login-title {
-  font-size: 18px;
-  font-weight: 700;
-  margin: 0 0 2px;
+  margin: 0 0 4px;
   text-align: center;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--color-brand-navy);
 }
 
 .login-subtitle {
-  font-size: 12.5px;
-  color: var(--color-text-muted);
+  margin: 0 0 26px;
   text-align: center;
-  margin: 0 0 24px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-muted);
 }
 
 .login-form .field {
-  margin-bottom: 14px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
+  margin-bottom: 14px;
 }
 
 .login-form label {
   font-size: 12px;
-  color: var(--color-text-muted);
+  font-weight: 600;
+  color: var(--color-text-sub);
 }
 
 .login-form input {
   width: 100%;
-  padding: 10px 12px;
+  padding: 11px 12px;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
+  border-radius: 10px;
+  background: var(--color-field-bg);
   font-size: 13.5px;
+  transition: border-color 0.12s ease, background-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.login-form input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  background: var(--color-surface);
+  box-shadow: var(--field-focus-ring);
 }
 
 .login-form .btn {
   width: 100%;
-  margin-top: 6px;
-  padding: 10px 16px;
+  margin-top: 8px;
+  padding: 11px 16px;
+  border: none;
+  border-radius: 10px;
+  background: var(--accent-grad);
+  box-shadow: var(--accent-shadow);
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.login-form .btn:hover:not(:disabled) {
+  filter: brightness(1.05);
 }
 
 .login-error {
-  background: #fef3f2;
-  color: #d92d20;
-  border-radius: var(--radius-sm);
-  padding: 9px 12px;
-  font-size: 12.5px;
   margin-bottom: 14px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: #fff0f1;
+  font-size: 12.5px;
+  color: #e0364d;
 }
 
 .login-error[hidden] {
@@ -71,8 +114,10 @@
 }
 
 .login-footer {
-  margin-top: 20px;
+  margin: 22px 0 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border-soft);
   text-align: center;
   font-size: 11.5px;
-  color: var(--color-text-muted);
+  color: var(--color-text-faint);
 }

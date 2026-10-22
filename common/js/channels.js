@@ -4,11 +4,11 @@
 // (reference/api-manual.md 5-1번).
 
 const CHANNELS = [
-  { no: "CH01", label: "저온", unit: "℃" },
-  { no: "CH02", label: "고온", unit: "℃" },
+  { no: "CH01", label: "흡입온도", unit: "℃" },
+  { no: "CH02", label: "토출온도", unit: "℃" },
   { no: "CH03", label: "오일온도", unit: "℃" },
-  { no: "CH04", label: "저압", unit: "MPa" },
-  { no: "CH05", label: "고압", unit: "MPa" },
+  { no: "CH04", label: "흡입압력", unit: "MPa" },
+  { no: "CH05", label: "토출압력", unit: "MPa" },
   { no: "CH06", label: "오일압력", unit: "MPa" },
   { no: "CH07", label: "운전전류", unit: "A" },
 ];

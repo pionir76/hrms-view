@@ -239,7 +239,7 @@ function renderCompressorSummary() {
 
 // ---------- 압축기 리스트 (채널 현재값 3초 갱신) ----------
 
-// 컬럼 순서: 압축기 | 저온 ~ 운전전류(채널 7개) | 통신 상태.
+// 컬럼 순서: 압축기 | 흡입온도 ~ 운전전류(채널 7개) | 통신 상태.
 // 채널 머리글은 채널명만 보여주고(채널번호·단위 없음), 단위는 각 값 뒤에 붙인다.
 function populateCompressorTableHead() {
   const channelHeaders = CHANNELS.map((ch) => `<th>${ch.label}</th>`).join("");
