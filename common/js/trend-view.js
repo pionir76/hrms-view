@@ -10,15 +10,16 @@
 //   view.showMessage("불러오는 중...");   // 그래프 대신 안내 문구(높이는 유지)
 //   view.resetView();                       // 하루 전체 보기로(애니메이션 없음)
 //
-// 화면 구성(root 안): 확대/이동 툴바 → 그래프(캔버스) → 채널 카드 7개(값·미니 추이·보기/숨기기)
+// 화면 구성(root 안): 확대/이동 툴바 → 그래프(캔버스) → 채널 카드 7개(값·미니 추이, 누르면 그 채널을 그린다)
 // 타임라인(timelineRoot 안): 하루 전체의 통신장애·경보 구간 막대 + 지금 그래프에 보이는 구간 표시
 //
 // 그래프 사양(사용자 결정):
-//   - 7채널을 한 차트에 그리고 채널마다 별도 y축, 선택한 채널 하나만 강조·눈금 표시(선택 해제 없음)
-//   - 보기/숨기기는 선택과 별개 — 숨긴 채널을 선택해도 자동으로 보이게 하지 않는다
+//   - 그래프에는 선택한 채널 하나만 그린다(2026-10-22 변경 — 예전 7채널 동시 표시·보기/숨기기 제거).
+//     채널은 항상 하나가 선택되어 있고(해제 없음), 카드를 누르면 그 채널로 바뀐다
 //   - 가로축은 00:00~23:59 고정, 값이 없는 분은 선을 끊는다. 통신장애 구간은 선을 잇고 배경만 칠한다
-//   - 확대·축소는 버튼으로만(휠 없음), 가운데 기준, 최소 30분. 버튼은 가감속 애니메이션,
-//     드래그 이동은 1:1로 따라간다. setData를 다시 불러도 보던 구간·선택·숨김은 유지된다
+//   - 그래프를 가로로 끌면 끈 구간(시작 시각~끝 시각)만 확대한다(2026-10-22 — 예전 드래그 이동 대체).
+//     세로 범위는 고르지 않는다. 최소 30분, "전체" 버튼으로 하루 전체로 돌아간다
+//   - 확대·축소·이동 버튼은 가운데 기준 가감속 애니메이션(휠 없음). setData를 다시 불러도 보던 구간·선택은 유지된다
 
 const TREND_VIEW_FULL_MAX = MINUTES_PER_DAY - 1; // 23:59
 const TREND_VIEW_MIN_SPAN = 30; // 최대 확대 = 30분
@@ -82,11 +83,9 @@ function pannedView(view, direction) {
   return clampView(view.min + shift, view.max + shift);
 }
 
-// 드래그 시작 범위에서 마우스를 deltaPx만큼 끌었을 때 — 오른쪽으로 끌면 과거(왼쪽)가 드러난다
-function draggedView(startView, deltaPx, areaWidthPx) {
-  const minutesPerPixel = (startView.max - startView.min) / areaWidthPx;
-  const delta = -deltaPx * minutesPerPixel;
-  return clampView(startView.min + delta, startView.max + delta);
+// 드래그로 고른 두 시각(분, 순서 무관)을 확대 범위로 — 30분보다 좁으면 가운데 기준으로 30분까지 넓힌다
+function dragSelectedView(minuteA, minuteB) {
+  return clampView(Math.min(minuteA, minuteB), Math.max(minuteA, minuteB));
 }
 
 // 확대/이동 버튼의 비활성화 상태 — 끝에 닿은 방향은 막는다
@@ -370,14 +369,13 @@ function createTrendView({ root, timelineRoot = null }) {
     datasets: [],
     lastDataIndex: 0,
     selectedChannel: DISPLAY_CHANNELS[0].no,
-    hiddenChannels: new Set(),
     // view는 지금 화면에 그려진 범위(애니메이션 중에는 중간값), viewTarget은 도착할 범위 —
     // 버튼을 연달아 누르면 도착점 기준으로 누적돼야 해서 둘을 따로 둔다
     view: { min: 0, max: TREND_VIEW_FULL_MAX },
     viewTarget: { min: 0, max: TREND_VIEW_FULL_MAX },
     decimalPlacesByChannel: {},
     animationFrame: null,
-    drag: { active: false, startX: 0, startView: null },
+    drag: { active: false, startPx: 0, currentPx: 0 },
   };
 
   root.classList.add("tv");
@@ -440,11 +438,9 @@ function createTrendView({ root, timelineRoot = null }) {
     Object.keys(zoomButtons).forEach((key) => {
       zoomButtons[key].disabled = disabled[key];
     });
-    const wrap = bodyEl.querySelector(".tv-chart-wrap");
-    if (wrap) wrap.classList.toggle("is-zoomed", !!st.chart && !isFullView(st.viewTarget));
   }
 
-  // 도착점을 정하고 가감속 애니메이션으로 이동한다(버튼 동작 전용)
+  // 도착점을 정하고 가감속 애니메이션으로 이동한다(버튼·드래그 구간 확대)
   function goToView(next) {
     st.viewTarget = next;
     updateZoomControls();
@@ -484,29 +480,68 @@ function createTrendView({ root, timelineRoot = null }) {
     else if (action === "reset") goToView({ min: 0, max: TREND_VIEW_FULL_MAX });
   });
 
-  // 드래그 이동 — 가감속·관성 없이 마우스를 1:1로 따라간다. 캔버스 밖으로 나가도 끊기지 않게
-  // 추적은 window에서 받는다.
+  // 드래그 구간 확대 — 그래프 위에서 가로로 끌면 끈 구간을 표시하고, 놓으면 그 구간으로 확대한다.
+  // 캔버스 밖으로 나가도 끊기지 않게 추적은 window에서 받고, 위치는 그래프 영역 좌우 끝에서 멈춘다.
+  const TREND_DRAG_MIN_PX = 4; // 이보다 짧게 끌면 클릭으로 보고 확대하지 않는다
+
+  function canvasOffsetX(event) {
+    const rect = st.chart.canvas.getBoundingClientRect();
+    const area = st.chart.chartArea;
+    return Math.max(area.left, Math.min(area.right, event.clientX - rect.left));
+  }
+
+  function minuteAtPx(px) {
+    return st.chart.scales.x.getValueForPixel(px);
+  }
+
+  function renderDragSelect() {
+    const wrap = bodyEl.querySelector(".tv-chart-wrap");
+    if (!wrap || !st.chart) return;
+    let el = wrap.querySelector(".tv-drag-select");
+    if (!el) {
+      el = document.createElement("div");
+      el.className = "tv-drag-select";
+      el.innerHTML = `<span class="tv-drag-select-label"></span>`;
+      wrap.appendChild(el);
+    }
+    const left = Math.min(st.drag.startPx, st.drag.currentPx);
+    const width = Math.abs(st.drag.currentPx - st.drag.startPx);
+    el.hidden = !st.drag.active || width < TREND_DRAG_MIN_PX;
+    if (el.hidden) return;
+    // 캔버스와 감싼 상자의 위치 차(테두리 등)를 더해 그래프 영역 위~아래에 정확히 맞춘다
+    const canvasRect = st.chart.canvas.getBoundingClientRect();
+    const wrapRect = wrap.getBoundingClientRect();
+    const offsetX = canvasRect.left - wrapRect.left - wrap.clientLeft;
+    const offsetY = canvasRect.top - wrapRect.top - wrap.clientTop;
+    const area = st.chart.chartArea;
+    el.style.left = `${offsetX + left}px`;
+    el.style.width = `${width}px`;
+    el.style.top = `${offsetY + area.top}px`;
+    el.style.height = `${area.bottom - area.top}px`;
+    const a = minuteAtPx(left);
+    const b = minuteAtPx(left + width);
+    el.querySelector(".tv-drag-select-label").textContent = `${minuteLabel(Math.round(a))} ~ ${minuteLabel(Math.round(b))}`;
+  }
+
   function onMouseDown(event) {
     if (event.button !== 0 || !st.chart || event.target.tagName !== "CANVAS") return;
-    if (isFullView(st.view)) return; // 하루 전체를 보고 있으면 옮길 곳이 없다
-    if (st.animationFrame) cancelAnimationFrame(st.animationFrame);
-    st.animationFrame = null;
-    st.drag = { active: true, startX: event.clientX, startView: { ...st.view } };
+    const px = canvasOffsetX(event);
+    st.drag = { active: true, startPx: px, currentPx: px };
     document.body.classList.add("tv-dragging");
     event.preventDefault();
   }
   function onMouseMove(event) {
     if (!st.drag.active || !st.chart) return;
-    const area = st.chart.chartArea;
-    const next = draggedView(st.drag.startView, event.clientX - st.drag.startX, area.right - area.left);
-    st.viewTarget = next;
-    setView(next.min, next.max);
-    updateZoomControls();
+    st.drag.currentPx = canvasOffsetX(event);
+    renderDragSelect();
   }
   function onMouseUp() {
     if (!st.drag.active) return;
     st.drag.active = false;
     document.body.classList.remove("tv-dragging");
+    renderDragSelect();
+    if (!st.chart || Math.abs(st.drag.currentPx - st.drag.startPx) < TREND_DRAG_MIN_PX) return;
+    goToView(dragSelectedView(minuteAtPx(st.drag.startPx), minuteAtPx(st.drag.currentPx)));
   }
   bodyEl.addEventListener("mousedown", onMouseDown);
   window.addEventListener("mousemove", onMouseMove);
@@ -528,7 +563,6 @@ function createTrendView({ root, timelineRoot = null }) {
             <div class="tv-readout-value">
               <span class="tv-readout-num">-</span>
               <span class="tv-readout-unit">${escapeHtml(ds.unit)}</span>
-              <button type="button" class="tv-readout-toggle" aria-label="${ds.channelNo} 보기/숨기기"></button>
             </div>
             ${buildSparklineSvg(ds.channelNo, ds.data.map((p) => p.y))}
           </div>
@@ -539,15 +573,7 @@ function createTrendView({ root, timelineRoot = null }) {
     el.querySelectorAll(".tv-readout-row").forEach((row) => {
       row.addEventListener("click", () => selectChannel(row.dataset.channel));
     });
-    // 토글은 선택과 별개 동작이라 클릭이 카드로 번지지 않게 막는다
-    el.querySelectorAll(".tv-readout-toggle").forEach((btn) => {
-      btn.addEventListener("click", (event) => {
-        event.stopPropagation();
-        toggleChannelVisibility(btn.closest(".tv-readout-row").dataset.channel);
-      });
-    });
     applyReadoutSelection();
-    applyChannelVisibility();
   }
 
   // 마우스 위치의 값만 텍스트로 갱신한다(DOM 재생성 없음 — 잦은 mousemove에도 가볍다)
@@ -568,29 +594,6 @@ function createTrendView({ root, timelineRoot = null }) {
     });
   }
 
-  function toggleChannelVisibility(channelNo) {
-    if (st.hiddenChannels.has(channelNo)) st.hiddenChannels.delete(channelNo);
-    else st.hiddenChannels.add(channelNo);
-    applyChannelVisibility();
-  }
-
-  function applyChannelVisibility() {
-    if (st.chart) {
-      st.chart.data.datasets.forEach((ds) => {
-        ds.hidden = st.hiddenChannels.has(ds.channelNo);
-      });
-      st.chart.update("none");
-    }
-    bodyEl.querySelectorAll(".tv-readout-row").forEach((row) => {
-      const isHidden = st.hiddenChannels.has(row.dataset.channel);
-      row.classList.toggle("is-hidden", isHidden);
-      const btn = row.querySelector(".tv-readout-toggle");
-      btn.classList.toggle("off", isHidden);
-      btn.setAttribute("aria-pressed", String(!isHidden));
-      btn.title = isHidden ? "그래프에 표시하기" : "그래프에서 숨기기";
-    });
-  }
-
   // 채널 하나는 항상 선택되어 있다 — 다른 채널을 누르면 그 채널로 바뀔 뿐 해제는 없다
   function selectChannel(channelNo) {
     if (st.selectedChannel === channelNo) return;
@@ -600,16 +603,13 @@ function createTrendView({ root, timelineRoot = null }) {
     updateReadoutValues(st.lastDataIndex);
   }
 
-  // 선택 채널은 굵게·맨 앞·선 아래 채움·세로축 표시, 나머지는 옅게
+  // 선택 채널만 그린다(선 아래 채움·세로축 표시) — 나머지 채널은 차트에서 감춘다
   function applyHighlight() {
     const chart = st.chart;
     if (!chart) return;
     chart.data.datasets.forEach((ds) => {
       const isSelected = ds.channelNo === st.selectedChannel;
-      ds.borderWidth = isSelected ? 2.6 : 1.6;
-      ds.borderColor = isSelected ? CHANNEL_COLORS[ds.channelNo] : hexToRgba(CHANNEL_COLORS[ds.channelNo], 0.22);
-      ds.fill = isSelected ? "start" : false;
-      ds.order = isSelected ? 0 : 1;
+      ds.hidden = !isSelected;
       const axis = chart.options.scales[`y-${ds.channelNo}`];
       if (axis) axis.display = isSelected;
     });
@@ -766,7 +766,7 @@ function createTrendView({ root, timelineRoot = null }) {
           },
         },
         // 세로축 폭 고정 — 확대하면 눈금 숫자 길이가 달라져 그래프가 좌우로 출렁인다.
-        // 보이는 축(선택 채널)만 고정해야 한다 — 숨긴 축 6개까지 고정하면 그래프가 오른쪽으로 쏠린다
+        // 보이는 축(선택 채널)만 고정해야 한다 — 감춘 축 6개까지 고정하면 그래프가 오른쪽으로 쏠린다
         afterFit: (scale) => {
           if (scale.options.display) scale.width = TREND_Y_AXIS_WIDTH;
         },
@@ -777,18 +777,17 @@ function createTrendView({ root, timelineRoot = null }) {
       ...ds,
       borderColor: CHANNEL_COLORS[ds.channelNo],
       backgroundColor: trendAreaFill,
-      borderWidth: 2,
+      borderWidth: 2.6,
       borderJoinStyle: "round",
-      fill: false,
+      fill: "start",
       pointRadius: 0,
-      // 마우스 위치 점은 선택 채널에만 찍는다(옅은 채널까지 찍으면 세로선 위가 어지럽다)
-      pointHoverRadius: (context) => (context.dataset.channelNo === st.selectedChannel ? 4 : 0),
+      pointHoverRadius: 4,
       pointHitRadius: 8,
       pointHoverBackgroundColor: "#fff",
       pointHoverBorderWidth: 2,
       tension: 0.15,
       yAxisID: `y-${ds.channelNo}`,
-      hidden: st.hiddenChannels.has(ds.channelNo),
+      hidden: ds.channelNo !== st.selectedChannel,
     }));
 
     Chart.defaults.font.family = TREND_FONT_FAMILY;

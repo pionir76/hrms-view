@@ -25,6 +25,21 @@ function ensureBusyOverlay() {
   return busyOverlayEl;
 }
 
+// 오버레이는 마우스만 막는다 — BUSY 중에 Esc(아래 모달 닫기)·Enter/Space(포커스된 저장 버튼 다시 누르기)·
+// Tab(가려진 입력칸으로 이동)이 먹히지 않게 키보드도 막는다. 다른 핸들러보다 먼저 받도록 window 캡처 단계에서 끊는다.
+const BUSY_BLOCKED_KEYS = new Set(["Escape", "Enter", " ", "Tab"]);
+["keydown", "keyup", "keypress"].forEach((type) => {
+  window.addEventListener(
+    type,
+    (event) => {
+      if (busyDepth === 0 || !BUSY_BLOCKED_KEYS.has(event.key)) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    },
+    true
+  );
+});
+
 function showGlobalBusy(label) {
   busyDepth += 1;
   setGlobalBusyLabel(label);
@@ -195,6 +210,17 @@ function compareRegion(a, b) {
 // 장비 목록에서 실제로 쓰이는 지구만 뽑아 정렬해서 돌려준다
 function collectRegions(equipments) {
   return [...new Set((equipments || []).map((e) => e.region).filter(Boolean))].sort(compareRegion);
+}
+
+// 장비명 + 관리번호 — 점검일지·운전일지에서 장비명 옆에 관리번호를 붙인다(2026-10-22 고객사 요청).
+// 관리번호가 없는 장비는 이름만. 글자로 쓰는 곳(선택 요약)은 이것, 문서 머리·PDF는 managementNoHtml.
+// 좌측 설비 드롭다운은 폭이 좁아 번호가 잘리므로 이름만 둔다(같은 시설동 안 장비명은 겹치지 않는다).
+function equipmentNameWithManagementNo(name, managementNumber) {
+  return managementNumber ? `${name} (${managementNumber})` : name;
+}
+
+function managementNoHtml(managementNumber) {
+  return managementNumber ? `<span class="mgmt-no">관리번호 ${escapeHtml(managementNumber)}</span>` : "";
 }
 
 function escapeHtml(text) {

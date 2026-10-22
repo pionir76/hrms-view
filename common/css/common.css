@@ -965,6 +965,16 @@ button {
   background: var(--color-bg);
 }
 
+/* 장비명 옆 관리번호(점검일지·운전일지 문서 머리) — 이름보다 한 단계 옅고 작게 */
+.mgmt-no {
+  margin-left: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
 /* ---------- 공통 BUSY 상태 UI ----------
    버튼 하나가 아니라 화면 전체를 덮는 오버레이 + 스핀 컨트롤로 처리 중임을 보여준다.
    모달 위(z-index 100)에서 눌러도 가려야 하므로 그보다 높은 z-index를 쓴다.

@@ -7,6 +7,7 @@ const state = {
   equipments: [], // GET /api/equipments 원본 전체
   equipmentId: null,
   equipmentName: "",
+  managementNumber: "", // 장비명 옆에 붙이는 관리번호
   year: null,
   month: null,
 };
@@ -14,6 +15,7 @@ const state = {
 const modalState = {
   equipmentId: null,
   equipmentName: "",
+  managementNumber: "",
   region: "",
   buildingName: "",
   weekStart: null, // 'yyyy-MM-dd' (일요일)
@@ -23,7 +25,7 @@ const modalState = {
   level2: null,
   level3: null,
   results: [], // [{ itemNo, category, content, sun..sat, memo }]
-  operatingStatus: "", // 장비 운영 상태 — 문서를 연 시점 값(우측 상단·PDF에 글자로 표시)
+  operatingStatus: "", // 장비 운영 상태 — 문서를 연 시점 값(우측 상단에 글자로 표시)
 };
 
 // ---------- 초기화 ----------
@@ -162,6 +164,7 @@ function onEquipmentChange() {
   const equipment = state.equipments.find((e) => String(e.id) === String(equipmentId));
   state.equipmentId = equipmentId;
   state.equipmentName = equipment ? equipment.name : "";
+  state.managementNumber = equipment ? equipment.managementNumber || "" : "";
   renderSelectionSummary();
   refreshEquipmentStatus(equipmentId, equipment ? equipment.status : null);
 
@@ -190,7 +193,7 @@ function renderSelectionSummary() {
 
   const parts = [region];
   if (buildingName) parts.push(buildingName);
-  if (state.equipmentId && state.equipmentName) parts.push(state.equipmentName);
+  if (state.equipmentId && state.equipmentName) parts.push(equipmentNameWithManagementNo(state.equipmentName, state.managementNumber));
 
   el.innerHTML = parts.map((p) => `<span class="selection-part">${escapeHtml(p)}</span>`).join(`<span class="selection-sep">›</span>`);
 }
@@ -424,6 +427,7 @@ async function openInspectionModal(weekStart) {
     modalState.operatingStatus = operatingStatus;
     modalState.equipmentId = state.equipmentId;
     modalState.equipmentName = state.equipmentName;
+    modalState.managementNumber = state.managementNumber;
     modalState.region = equipment ? equipment.region : "";
     modalState.buildingName = equipment ? equipment.buildingName : "";
     modalState.weekStart = weekStart;
@@ -442,94 +446,49 @@ async function openInspectionModal(weekStart) {
   }
 }
 
-// ---------- PDF 저장 (common/js/pdf-export.js) ----------
-//
-// 엑셀 저장을 대체한다(사용자 결정 2026-09-29, 교육훈련에서 먼저 시험). 결재가 끝난 문서만
-// 저장할 수 있고(교육훈련과 같은 규칙), 그 문서는 잠겨 있으므로 저장된 값(modalState)으로 만든다.
-// 요일 7칸 때문에 A4 가로로 찍는다(.pdf-doc.is-landscape).
-
-function renderInspectionPdfButton() {
-  const btn = document.getElementById("exportPdfBtn");
+// 결재가 끝난 문서만 엑셀로 저장할 수 있다(예전 PDF 저장과 같은 규칙)
+function renderInspectionExcelButton() {
+  const btn = document.getElementById("exportExcelBtn");
   if (!btn) return;
   const complete = isApprovalComplete(modalState);
   btn.disabled = !complete;
-  btn.title = complete ? "" : "결재가 완료된 문서만 PDF로 저장할 수 있습니다";
+  btn.title = complete ? "" : "결재가 완료된 문서만 엑셀로 저장할 수 있습니다";
 }
 
-function exportInspectionLogToPdf() {
+// ---------- 엑셀 저장 (common/js/excel-export.js) ----------
+//
+// PDF는 편집이 안 돼 쓰기 어렵다는 고객사 요청(2026-10-22)으로 되살리고 PDF 저장은 뺐다. 결재 완료 문서만 저장하고,
+// 잠긴 화면 표를 그대로 훑어 옮긴다 — O / X 칸은 아이콘의 <title> 글자(O, /, X)가 그대로 들어간다.
+async function exportInspectionLogToExcel() {
   if (modalState.id === null || !isApprovalComplete(modalState)) return;
-
-  // 결재란은 화면과 같은 공통 모듈로 그리고 조작 버튼(취소)만 걷어낸다
-  const approvalEl = document.createElement("div");
-  approvalEl.className = "approval-bar";
-  renderApprovalBar(approvalEl, modalState, { allowApprove: false });
-  approvalEl.querySelectorAll("button").forEach((btn) => btn.remove());
-
   const period = `${formatDateKo(modalState.weekStart)} (일) ~ ${formatDateKo(weekEndDateStr(modalState.weekStart))} (토)`;
-
-  // 화면 표와 같은 묶음(rowspan)·순서로, 입력칸과 토글 버튼 대신 글자와 O/X 모양으로 채운다
-  const rowsHtml = [];
-  groupResultsByItem(modalState.results).forEach((group) => {
-    group.rows.forEach((r, i) => {
-      const leading =
-        i === 0
-          ? `<td class="pdf-center" rowspan="${group.rows.length}">${escapeHtml(group.key)}</td>
-             <td class="pdf-middle" rowspan="${group.rows.length}">${escapeHtml(r.category)}</td>`
-          : "";
-      const days = DAY_KEYS.map(
-        (day) => `<td class="pdf-center"><span class="ox-toggle-btn ${oxCellClass(r[day])}">${oxToggleSymbol(r[day])}</span></td>`
-      ).join("");
-      rowsHtml.push(`<tr>${leading}<td class="pdf-middle">${escapeHtml(r.content)}</td>${days}<td class="pdf-middle">${escapeHtml(r.memo || "")}</td></tr>`);
-    });
-  });
-
-  printPdfDocument({
-    fileName: pdfSafeFileName(["점검일지", modalState.region, modalState.equipmentName, modalState.weekStart]),
-    html: `
-      <div class="pdf-doc is-landscape">
-        <div class="pdf-head">
-          <div>
-            <h1 class="pdf-title"><small>INSPECTION</small>점검일지</h1>
-            <p class="pdf-meta">
-              ${escapeHtml(modalState.region)} · ${escapeHtml(modalState.buildingName)} · <b>${escapeHtml(modalState.equipmentName)}</b><br />
-              점검기간 ${escapeHtml(period)}
-            </p>
-          </div>
-          <div class="pdf-head-right">
-            <div class="pdf-status">운영 상태 : ${escapeHtml(modalState.operatingStatus || "-")}</div>
-            ${approvalEl.outerHTML}
-          </div>
-        </div>
-        <table class="pdf-table">
-          <colgroup>
-            <col style="width: 44px" />
-            <col style="width: 150px" />
-            <col />
-            ${DAY_KEYS.map(() => `<col style="width: 40px" />`).join("")}
-            <col style="width: 150px" />
-          </colgroup>
-          <thead>
-            <tr>
-              <th>번호</th>
-              <th>점검항목</th>
-              <th>점검내용</th>
-              ${DAY_LABELS.map((l) => `<th>${l}</th>`).join("")}
-              <th>비고</th>
-            </tr>
-          </thead>
-          <tbody>${rowsHtml.join("")}</tbody>
-        </table>
-        <div class="pdf-box">
-          <div class="pdf-box-title">점검자 의견</div>
-          <div class="pdf-box-body">${escapeHtml(modalState.opinion || "")}</div>
-          <div class="pdf-note-row">
-            <p class="pdf-note">${document.querySelector(".opinion-note")?.innerHTML.trim() ?? ""}</p>
-            <span class="pdf-printed">${escapeHtml(pdfPrintedByText())}</span>
-          </div>
-        </div>
-      </div>
-    `,
-  });
+  const opinion = document.getElementById("opinionTextarea")?.value.trim() ?? "";
+  try {
+    await withGlobalBusy(
+      () =>
+        exportLogToExcel({
+          fileName: excelFileName(["점검일지", modalState.region, modalState.equipmentName, modalState.weekStart]),
+          sheets: [
+            {
+              name: modalState.weekStart,
+              title: "점검일지",
+              info: [
+                ["지역", modalState.region],
+                ["시설동", modalState.buildingName],
+                ["장비명", equipmentNameWithManagementNo(modalState.equipmentName, modalState.managementNumber)],
+                ["점검기간", period],
+              ],
+              approvals: approvalsForExcel(modalState),
+              table: document.querySelector(".inspection-table"),
+              notes: [`점검자 의견: ${opinion || "-"}`, document.querySelector(".opinion-note")?.textContent.replace(/\s+/g, " ").trim() ?? ""],
+            },
+          ],
+        }),
+      { label: "엑셀 파일 만드는 중..." }
+    );
+  } catch (err) {
+    window.alert(`엑셀 파일을 만들지 못했습니다. (${err.message})`);
+  }
 }
 
 function closeInspectionModal() {
@@ -552,7 +511,7 @@ function renderModalBody() {
     <div class="inspection-modal-head">
       <div>
         <p class="inspection-modal-location">${escapeHtml(modalState.region)} · ${escapeHtml(modalState.buildingName)}</p>
-        <h3 class="inspection-modal-title">${escapeHtml(modalState.equipmentName)}</h3>
+        <h3 class="inspection-modal-title">${escapeHtml(modalState.equipmentName)}${managementNoHtml(modalState.managementNumber)}</h3>
         <p class="inspection-modal-subtitle">${formatDateKo(modalState.weekStart)} (일) ~ ${formatDateKo(weekEndDateStr(modalState.weekStart))} (토)</p>
       </div>
       <span class="doc-operating-status">운영 상태 : ${escapeHtml(modalState.operatingStatus || "-")}</span>
@@ -600,7 +559,7 @@ function renderModalBody() {
         ${session && session.role === "시스템관리자" && modalState.id !== null && isApprovalStarted(modalState) ? `<button type="button" class="btn btn-secondary" id="resetApprovalBtn">결재 전체 리셋</button>` : ""}
       </div>
       <div class="footer-right">
-        ${modalState.id !== null ? `<button type="button" class="btn btn-secondary" id="exportPdfBtn">PDF 저장</button>` : ""}
+        ${modalState.id !== null ? `<button type="button" class="btn btn-secondary" id="exportExcelBtn">엑셀 저장</button>` : ""}
         <button type="button" class="btn btn-secondary" id="modalCancelBtn">닫기</button>
         ${locked ? "" : `<button type="button" class="btn btn-primary" id="saveInspectionBtn">저장</button>`}
       </div>
@@ -612,10 +571,10 @@ function renderModalBody() {
   renderInspectionApprovalBar();
   renderInspectionTable();
 
-  // 저장 전 문서(id 없음)는 PDF 대상이 아니라 버튼이 없다
-  const pdfBtn = document.getElementById("exportPdfBtn");
-  if (pdfBtn) pdfBtn.addEventListener("click", exportInspectionLogToPdf);
-  renderInspectionPdfButton();
+  // 저장 전 문서(id 없음)는 엑셀 대상이 아니라 버튼이 없다
+  const excelBtn = document.getElementById("exportExcelBtn");
+  if (excelBtn) excelBtn.addEventListener("click", exportInspectionLogToExcel);
+  renderInspectionExcelButton();
   document.getElementById("modalCancelBtn").addEventListener("click", closeInspectionModal);
 
   const saveBtn = document.getElementById("saveInspectionBtn");

@@ -10,8 +10,9 @@
 //   첨부 ownerType=AppointmentReport, ownerId=사용자 id — 선해임 신고서(사용자당 1건, 다시 올리면 교체)
 //
 // 화면(사용자 결정 2026-09-17):
-//   - 첫 화면: 선임(isAppointed) + 활성 인원만 담당업무 단계별(총괄자 → 책임자 → 안전관리원 → 일반관리원)
-//     카드로 보여준다. 카드: 담당업무·소속팀·성명·연락처1·2·신고서 받기·세부정보 버튼
+//   - 첫 화면: 선임(isAppointed) + 활성 인원만 담당업무 단계별(총괄자 → 책임자 → 안전관리원)
+//     카드로 보여준다. 일반관리원은 조직도에 넣지 않는다(2026-10-22 고객사 요청 — 관리 모달에서는 보인다).
+//     카드: 담당업무·소속팀·성명·연락처1·2·신고서 받기·세부정보 버튼
 //   - 세부정보 팝업: ID를 뺀 전체 정보 + 담당장비(지역 → 시설동으로 묶음)
 //   - "관리" 버튼(시스템관리자만): 좌 인원 목록 / 우 정보 수정·신규 작성. 미선임·비활성 인원도 여기서는 보인다
 //   - 일반 사용자의 본인 정보 수정은 이 페이지와 무관(별도 "내 정보"에서 예정)
@@ -22,6 +23,7 @@ const ORG_ROLES = [
   { role: "안전관리원", cls: "role-3" },
   { role: "일반관리원", cls: "role-4" },
 ];
+const ORG_CHART_HIDDEN_ROLES = ["일반관리원"]; // 조직도(첫 화면)에서 빼는 담당업무
 const REPORT_OWNER_TYPE = "AppointmentReport";
 
 const orgState = {
@@ -96,8 +98,8 @@ const ICON_DOWNLOAD = `<i class="org-icon-download" aria-hidden="true"></i>`;
 
 function renderOrgChart() {
   const el = document.getElementById("orgChart");
-  // 선임 + 활성 인원만 — 미선임·비활성 인원은 관리 모달에서만 보인다(사용자 결정)
-  const visible = orgState.users.filter((u) => u.isActive && u.isAppointed);
+  // 선임 + 활성 인원만 — 미선임·비활성 인원과 일반관리원은 관리 모달에서만 보인다(사용자 결정)
+  const visible = orgState.users.filter((u) => u.isActive && u.isAppointed && !ORG_CHART_HIDDEN_ROLES.includes(u.role));
 
   const tiers = ORG_ROLES.map((r) => ({ ...r, users: visible.filter((u) => u.role === r.role) })).filter((t) => t.users.length > 0);
 
@@ -290,6 +292,7 @@ const om = {
   report: null, // 저장된 신고서 메타데이터 { id, fileName, sizeBytes }
   reportPendingFile: null, // 저장 시 올릴 파일(교체 포함)
   reportDeleteRequested: false,
+  reportSizeError: null, // 10MB를 넘어 빠진 파일 안내 — 다른 파일을 고르거나 다른 인원으로 바꾸면 지운다
   usernameChecked: null, // { username, available } — 신규 등록 시 중복확인 결과
 };
 
@@ -365,12 +368,24 @@ function initManageModal() {
     om.appointed = v;
   });
 
-  // 신고서: 고른 파일은 저장할 때 올린다(신규 인원은 저장 전에 사용자 id가 없어 바로 올릴 수 없다)
+  // 신고서: 고른 파일은 저장할 때 올린다(신규 인원은 저장 전에 사용자 id가 없어 바로 올릴 수 없다).
+  // 10MB 초과는 고르는 즉시 거른다 — 스캔한 신고서는 10MB를 넘기 쉬운데 아래쪽 작은 문구만으로는
+  // 놓치기 쉬워(2026-10-22 고객사 "저장 안 됨" 문의) 알림 창으로 알리고 칸 아래에도 남긴다.
   document.getElementById("omReportFile").addEventListener("change", (event) => {
-    const files = filterFilesWithinSizeLimit([...event.target.files], (msg) => showOmError(msg));
+    const file = event.target.files[0];
     event.target.value = "";
-    if (files.length === 0) return;
-    om.reportPendingFile = files[0];
+    if (!file) return;
+    if (file.size > ATTACHMENT_MAX_BYTES) {
+      om.reportSizeError = `"${file.name}"(${formatFileSize(file.size)})은 10MB를 넘어 올릴 수 없습니다.`;
+      renderReportField();
+      window.alert(
+        `${om.reportSizeError}\n\n선해임 신고서는 파일 하나당 최대 10MB까지 올릴 수 있습니다.\n스캔 해상도를 낮추거나 압축해서 10MB 이하로 줄인 뒤 다시 올려 주세요.`
+      );
+      return;
+    }
+    clearOmMessages();
+    om.reportSizeError = null;
+    om.reportPendingFile = file;
     om.reportDeleteRequested = false;
     renderReportField();
   });
@@ -469,6 +484,7 @@ function startNewUser() {
   om.report = null;
   om.reportPendingFile = null;
   om.reportDeleteRequested = false;
+  om.reportSizeError = null;
   om.usernameChecked = null;
 
   ["omUsername", "omPassword", "omPasswordConfirm", "omFullName", "omDepartment", "omPosition", "omRole", "omPhone1", "omPhone2", "omBackup", "omLegalDate", "omNextDate", "omEquipSearch"].forEach((id) =>
@@ -494,6 +510,7 @@ async function selectUser(userId) {
   om.report = null;
   om.reportPendingFile = null;
   om.reportDeleteRequested = false;
+  om.reportSizeError = null;
   om.usernameChecked = null;
 
   setVal("omUsername", u.username);
@@ -617,6 +634,13 @@ function renderReportField() {
   }
 
   el.innerHTML = `${fileHtml}<span class="om-report-actions">${actions}</span>`;
+  el.classList.toggle("is-error", !!om.reportSizeError);
+
+  const hint = document.getElementById("omReportHint");
+  hint.className = `om-hint${om.reportSizeError ? " om-hint-error" : ""}`;
+  if (om.reportSizeError) hint.textContent = `${om.reportSizeError} 10MB 이하로 줄여 다시 올려 주세요.`;
+  else if (om.reportPendingFile) hint.textContent = "저장을 눌러야 올라갑니다. 파일당 최대 10MB";
+  else hint.textContent = "파일당 최대 10MB";
   el.querySelectorAll("[data-act]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const act = btn.dataset.act;

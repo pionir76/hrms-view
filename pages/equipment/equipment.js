@@ -48,6 +48,40 @@ async function initEquipmentPage() {
   await withGlobalBusy(loadEquipments);
   initEquipmentFilters();
   renderEquipmentList();
+  await openChannelFromUrl();
+}
+
+// 이벤트 상세 창의 "경보 범위 설정 ↗" 링크로 들어온 경우(?equipment=&compressor=&channel=, 2026-10-22) —
+// 그 장비의 압축기 창을 열고 해당 압축기를 고른 뒤, 그 채널 줄을 강조하고 하한 칸에 커서를 둔다.
+// 목록(담당 장비)에 없는 장비면 고칠 권한이 없는 것이라 안내만 한다. 새로 고침해도 다시 열리지 않게 주소는 비운다.
+async function openChannelFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const equipmentId = params.get("equipment");
+  if (!equipmentId) return;
+  const compressorId = params.get("compressor");
+  const channelNo = params.get("channel");
+  window.history.replaceState(null, "", window.location.pathname);
+
+  if (!findEquipment(equipmentId)) {
+    window.alert("이 장비의 경보 범위를 설정할 권한이 없거나 장비를 찾을 수 없습니다.");
+    return;
+  }
+  await openCompressorPopup(equipmentId);
+  const exists = compressorPopupState.compressors.some((c) => String(c.id) === String(compressorId));
+  if (exists && String(compressorPopupState.selectedId) !== String(compressorId)) {
+    await openCompressorDetail(compressorId);
+    renderCompressorSeqList();
+  }
+  if (exists && channelNo) highlightChannelRow(channelNo);
+}
+
+function highlightChannelRow(channelNo) {
+  const row = document.querySelector(`#cmChannelBody tr[data-channel="${channelNo}"]`);
+  if (!row) return;
+  row.classList.add("eq-ch-target");
+  row.scrollIntoView({ block: "center" });
+  const lower = row.querySelector(".eq-ch-lower");
+  if (lower && !lower.disabled) lower.focus();
 }
 
 // 모달/팝업이 하나라도 열려있는 동안 배경(장비 관리 메인 목록)의 마우스 휠 스크롤이
@@ -93,7 +127,8 @@ async function loadEquipments() {
   }
 }
 
-// 압축기 수는 GET /api/equipments 응답의 compressorCount를 그대로 쓴다(전체 합 246 = 등록된 압축기 수).
+// 압축기 수는 GET /api/equipments 응답의 registeredCompressorCount(실제 등록된 압축기 행 수)를 쓴다(전체 합 246).
+// compressorCount는 이력카드의 "압축기수량" 사양 칸이라 글자도 들어갈 수 있다(2026-10-22 string으로 변경).
 //
 // 예전엔 GET /api/compressors(4번)를 한 번 더 불러 (시설동, 장비명)으로 묶어 세었는데, 4번이
 // 2026-09-17부터 **운영 장비의 압축기만** 내려주게 바뀌면서 미운영 장비가 전부 COMP#0으로
@@ -124,6 +159,13 @@ function numOrNull(v) {
 
 function intOrNull(v) {
   return v === "" || v === null || v === undefined ? null : parseInt(v, 10);
+}
+
+// 장비 이력카드 사양 칸(냉동능력·용량·수량·압력·전압·전류 등)은 숫자 외 글자도 받는다
+// (2026-10-22 고객사 요청, 백엔드도 string으로 변경) — 앞뒤 공백만 정리하고 빈 칸은 null
+function textOrNull(v) {
+  const t = (v ?? "").trim();
+  return t === "" ? null : t;
 }
 
 function statusBadge(status) {
@@ -229,7 +271,8 @@ function renderEquipmentList() {
 
   tbody.innerHTML = pageItems
     .map((e, i) => {
-      const compressorCount = e.compressorCount ?? 0;
+      // 실제 등록된 압축기 수 — compressorCount는 이력카드의 사양 글자 칸이라 쓰지 않는다(2026-10-22)
+      const compressorCount = e.registeredCompressorCount ?? 0;
       // 열 폭이 고정이라 긴 위치·장비명은 잘린다 — 잘린 내용을 마우스로 확인할 수 있게 통째로 단다
       const fullLabel = escapeHtml(`${formatLocation(e)} · ${e.name}`);
       return `
@@ -487,12 +530,31 @@ function photoErrorMessage(err) {
   if (err.status === 403) return "권한이 없습니다. 시스템관리자이거나 이 장비의 담당자만 사진을 등록/삭제할 수 있습니다.";
   if (err.status === 400) return "jpg, jpeg, png 이미지만 업로드할 수 있고, 파일 용량은 10MB를 넘을 수 없습니다.";
   if (err.status === 404) return "장비 또는 파일을 찾을 수 없습니다.";
+  // 응답 없이 연결이 끊긴 경우(fetch 자체 실패) — 서버가 약 28MB 넘는 요청은 받기 전에 끊어 "Failed to fetch"만
+  // 남는다(2026-10-22 고객사 문의 재현). 크기는 아래에서 미리 거르므로 여기 오면 대개 네트워크 문제다.
+  if (!err.status) return "서버와 연결이 끊겨 사진을 올리지 못했습니다. 네트워크 상태를 확인하고 다시 시도해 주세요.";
   return `사진 처리에 실패했습니다. (${err.message})`;
 }
+
+const PHOTO_EXTENSIONS = [".jpg", ".jpeg", ".png"]; // 서버 허용 확장자와 같다
 
 async function handlePhotoFileSelected(slot, file) {
   if (!equipmentModalState.id) return;
   hideFormError();
+
+  // 서버까지 보내기 전에 거른다 — 큰 휴대폰 사진(30MB 넘는 고화소)은 서버가 응답 없이 끊어
+  // 원인을 알 수 없는 "Failed to fetch"로만 보였다
+  const ext = file.name.slice(file.name.lastIndexOf(".")).toLowerCase();
+  if (!PHOTO_EXTENSIONS.includes(ext)) {
+    showFormError(`jpg, jpeg, png 이미지만 올릴 수 있습니다. (선택한 파일: ${file.name})`);
+    return;
+  }
+  if (file.size > ATTACHMENT_MAX_BYTES) {
+    const message = `사진 용량이 ${formatFileSize(file.size)}로 10MB를 넘어 올릴 수 없습니다. 해상도를 낮추거나 압축해서 10MB 이하로 줄인 뒤 다시 올려 주세요.`;
+    showFormError(message);
+    window.alert(message);
+    return;
+  }
 
   const formData = new FormData();
   formData.append("file", file);
@@ -577,24 +639,24 @@ function collectVisibleEquipmentFields() {
     manufacturer: getValue("fManufacturer") || null,
     permitNumber: getValue("fPermitNumber") || null,
     managementNumber: getValue("fManagementNumber") || null,
-    legalRefrigerationCapacity: numOrNull(getValue("fLegalCapacity")),
-    usRefrigerationCapacity: numOrNull(getValue("fUsCapacity")),
+    legalRefrigerationCapacity: textOrNull(getValue("fLegalCapacity")),
+    usRefrigerationCapacity: textOrNull(getValue("fUsCapacity")),
     refrigerant: getValue("fRefrigerant") || null,
-    chargeAmount: numOrNull(getValue("fChargeAmount")),
+    chargeAmount: textOrNull(getValue("fChargeAmount")),
     compressorManufacturer: getValue("fCompManufacturer") || null,
     compressorType: getValue("fCompType") || null,
-    compressorCount: intOrNull(getValue("fCompCount")),
-    compressorCapacity: numOrNull(getValue("fCompCapacity")),
+    compressorCount: textOrNull(getValue("fCompCount")),
+    compressorCapacity: textOrNull(getValue("fCompCapacity")),
     coolingTowerManufacturer: getValue("fTowerManufacturer") || null,
     coolingTowerType: getValue("fTowerType") || null,
-    coolingTowerCount: intOrNull(getValue("fTowerCount")),
-    coolingTowerCapacity: numOrNull(getValue("fTowerCapacity")),
+    coolingTowerCount: textOrNull(getValue("fTowerCount")),
+    coolingTowerCapacity: textOrNull(getValue("fTowerCapacity")),
     condenserType: getValue("fCondenserType") || null,
     evaporatorType: getValue("fEvaporatorType") || null,
-    designPressure: numOrNull(getValue("fDesignPressure")),
-    overPressureCutoff: numOrNull(getValue("fOverPressureCutoff")),
-    ratedVoltage: numOrNull(getValue("fRatedVoltage")),
-    ratedCurrent: numOrNull(getValue("fRatedCurrent")),
+    designPressure: textOrNull(getValue("fDesignPressure")),
+    overPressureCutoff: textOrNull(getValue("fOverPressureCutoff")),
+    ratedVoltage: textOrNull(getValue("fRatedVoltage")),
+    ratedCurrent: textOrNull(getValue("fRatedCurrent")),
     safetyValve: getValue("fSafetyValve").trim() || null,
     notes: getValue("fNotes") || null,
     runningCurrentThreshold: toRawValue(numOrNull(getValue("fRunningCurrentThreshold")), equipmentModalState.runningCurrentThresholdDecimalPlaces),
@@ -660,7 +722,7 @@ async function saveEquipment() {
           method: "POST",
           body: JSON.stringify({ equipment: collectEquipmentPayload(), compressors }),
         });
-        created.compressorCount = compressors.length; // 방금 등록한 개수를 바로 반영 — 다시 불러올 필요 없음
+        created.registeredCompressorCount = compressors.length; // 방금 등록한 개수를 바로 반영 — 다시 불러올 필요 없음
         state.equipments.push(created);
         equipmentModalDirty.reset(); // 방금 저장한 내용을 "저장 안 한 변경사항"으로 다시 묻지 않도록
         closeEquipmentModal();
@@ -1727,8 +1789,8 @@ async function refreshInspectionAttachmentCount() {
 // 수리보수 및 철거일지 팝업 (좌: 목록 / 우: 상세 — 검사이력과 동일 구조, 결재 포함)
 // ========================================================================
 //
-// 실제 API는 api-manual.md 35~42번. 결재는 안전관리원(level1)이 항상 "해당없음"이라
-// 실제 승인 단계는 안전관리책임자 → 안전관리총괄자 2개다. 한 단계라도 승인되면 서버가
+// 실제 API는 api-manual.md 35~42번. 결재는 점검일지·운전일지와 같은 3단계(안전관리원 → 안전관리책임자 →
+// 안전관리총괄자)다 — 2026-10-22 고객사 요청으로 안전관리원 단계가 생겼다(예전엔 "해당없음"). 한 단계라도 승인되면 서버가
 // 수정을 409로 막고 삭제는 시스템관리자만 가능해지는데, 그 판정 결과가 응답의
 // canEdit/canDelete다(작성자 id가 응답에 없어 프론트가 직접 판단할 수 없다 — 검사이력과 동일).
 //
@@ -1813,11 +1875,13 @@ function sortedRepairItems() {
   return repairPopupState.items.slice().sort((a, b) => (b.performedAt || "").localeCompare(a.performedAt || ""));
 }
 
-// 이 문서유형은 level1(안전관리원)이 항상 "해당없음"이라 실제 단계는 책임자 → 총괄자 2개다.
+// 결재 3단계(안전관리원 → 책임자 → 총괄자) 중 지금 기다리는 단계. 승인 외에 해당없음·전결도 "끝난 단계"로 본다
+// (isApprovalLevelDone, common/js/approval.js) — 서버 규칙이 다시 바뀌어도 배지가 맞게 따라간다.
 function repairApprovalStatus(item) {
-  if (item.level3?.status === "Approved") return { label: "완료", className: "badge-normal" };
-  if (item.level2?.status === "Approved") return { label: "총괄자 결재 대기", className: "badge-warning" };
-  return { label: "책임자 결재 대기", className: "badge-muted" };
+  if (isApprovalLevelDone(item.level3)) return { label: "완료", className: "badge-normal" };
+  if (isApprovalLevelDone(item.level2)) return { label: "총괄자 결재 대기", className: "badge-warning" };
+  if (isApprovalLevelDone(item.level1)) return { label: "책임자 결재 대기", className: "badge-warning" };
+  return { label: "안전관리원 결재 대기", className: "badge-muted" };
 }
 
 // 서버는 UTC(예: 2025-11-27T15:00:00+00:00)로 주고 화면은 한국시간 날짜로 보여준다.
@@ -2067,9 +2131,9 @@ function showRepairPopupError(message) {
 
 // 신규작성 중에도 같은 결재란을 보여줘서 문서 전체 모양이 항상 같게 유지한다
 // (저장 전에는 문서 id가 없어 결재 버튼 없이 "대기"로만 표시된다).
-// 이 문서유형은 level1(안전관리원)이 항상 "해당없음"이라 저장 전에도 그 모양으로 그린다.
+// 3단계 모두 결재 대상이라 저장 전에는 전부 "대기"로 그린다.
 const REPAIR_EMPTY_APPROVAL = {
-  level1: { status: "NotApplicable" },
+  level1: { status: "Pending" },
   level2: { status: "Pending" },
   level3: { status: "Pending" },
 };

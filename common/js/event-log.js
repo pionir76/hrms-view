@@ -107,6 +107,39 @@ function eventTargetLabel(event, compressors = []) {
   return event.channelNo ? `${compressorLabel} · ${event.channelNo}` : compressorLabel;
 }
 
+// ---------- 경보 범위 설정 링크 (2026-10-22 고객사 요청) ----------
+//
+// 경보 이벤트 상세에서 장비 관리의 그 압축기·채널 설정으로 바로 간다(새 탭 — 실시간 현황 감시를 끊지 않는다).
+// 채널 설정은 시스템관리자·담당자만 고칠 수 있어, 고칠 수 있는 장비일 때만 링크를 보인다. 기준은 장비 관리
+// 목록과 같은 GET /api/equipments?mine=true(시스템관리자는 서버가 전체를 준다)이고, 페이지당 한 번만 받는다.
+// 링크 주소는 이 모듈을 쓰는 화면이 모두 pages/<화면>/ 아래에 있다는 전제의 상대 경로다.
+let managedEquipmentIdsPromise = null;
+
+function fetchManagedEquipmentIds() {
+  if (!managedEquipmentIdsPromise) {
+    managedEquipmentIdsPromise = apiFetch("/api/equipments?mine=true")
+      .then((list) => new Set(list.map((e) => String(e.id))))
+      .catch(() => {
+        managedEquipmentIdsPromise = null; // 실패하면 다음에 다시 받는다 — 이번엔 링크 없이 연다
+        return new Set();
+      });
+  }
+  return managedEquipmentIdsPromise;
+}
+
+function updateRangeLink(modal, event) {
+  const link = modal.querySelector("[data-range-link]");
+  link.hidden = true;
+  if (event.category !== "Alarm" || !event.equipmentId || !event.compressorId || !event.channelNo) return;
+  const params = new URLSearchParams({ equipment: event.equipmentId, compressor: event.compressorId, channel: event.channelNo });
+  link.href = `../equipment/equipment.html?${params}`;
+  fetchManagedEquipmentIds().then((ids) => {
+    // 받는 사이 다른 이벤트로 바뀌었거나 창을 닫았으면 그대로 둔다
+    if (modal.hidden || modal.dataset.eventId !== String(event.id)) return;
+    link.hidden = !ids.has(String(event.equipmentId));
+  });
+}
+
 // ---------- 상세 팝업 (페이지마다 마크업을 두지 않고 처음 열 때 body에 한 번 붙인다) ----------
 
 let eventModalEl = null;
@@ -134,7 +167,7 @@ function ensureEventModal() {
             <tr><th>구분</th><td data-field="category">-</td></tr>
             <tr><th>대상</th><td data-field="target">-</td></tr>
             <tr data-alarm-row><th>측정값</th><td data-field="value">-</td></tr>
-            <tr data-alarm-row><th>정상 범위</th><td data-field="range">-</td></tr>
+            <tr data-alarm-row><th>정상 범위</th><td><span data-field="range">-</span><a class="ev-range-link" data-range-link target="_blank" rel="noopener" hidden>경보 범위 설정 ↗</a></td></tr>
           </tbody>
         </table>
         <p class="ev-modal-note" hidden>이 경보는 상세 값이 기록되기 전(2026-09-16 이전)에 발생해 측정값 정보가 없습니다.</p>
@@ -177,7 +210,9 @@ function openEventModal(event, compressors = []) {
         ? `${formatRawValue(event.lowerLimit, dp)} ~ ${formatRawValue(event.upperLimit, dp)}${unit}`
         : "기록 없음";
   }
+  modal.dataset.eventId = String(event.id);
   modal.hidden = false;
+  updateRangeLink(modal, event);
 }
 
 function closeEventModal() {

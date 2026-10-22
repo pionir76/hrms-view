@@ -145,6 +145,20 @@
   border-bottom: none;
 }
 
+/* 정상 범위 옆 "경보 범위 설정 ↗" — 장비 관리의 채널 설정을 새 탭으로 연다 */
+.ev-range-link {
+  margin-left: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-primary);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.ev-range-link:hover {
+  text-decoration: underline;
+}
+
 .ev-detail-table tr[hidden] {
   display: none;
 }

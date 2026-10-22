@@ -123,15 +123,43 @@
   height: 100% !important;
 }
 
-/* 확대 상태에서만 끌어서 옮길 수 있다 — 커서로 알려준다 */
-.tv-chart-wrap.is-zoomed canvas {
-  cursor: grab;
+/* 가로로 끌어 고른 구간을 확대한다 — 커서로 알려준다 */
+.tv-chart-wrap canvas {
+  cursor: crosshair;
 }
 
 body.tv-dragging,
 body.tv-dragging canvas {
-  cursor: grabbing !important;
+  cursor: col-resize !important;
   user-select: none;
+}
+
+/* 드래그 중 고른 구간 — 그래프 영역 위에서 아래까지 세로 전체를 덮는다 */
+.tv-drag-select {
+  position: absolute;
+  z-index: 1;
+  border-right: 1px solid rgba(79, 110, 255, 0.55);
+  border-left: 1px solid rgba(79, 110, 255, 0.55);
+  background: rgba(79, 110, 255, 0.1);
+  pointer-events: none;
+}
+
+.tv-drag-select[hidden] {
+  display: none;
+}
+
+.tv-drag-select-label {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 2px 8px;
+  border-radius: 9px;
+  background: #172033;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
 }
 
 /* 채널 카드 7개 — 폭이 좁은 화면에서는 두 줄로 접힌다 */
@@ -232,63 +260,12 @@ body.tv-dragging canvas {
   color: var(--color-text-muted);
 }
 
-/* 보기/숨기기 — 아이콘은 mask로 찍어 색을 입힌다(svg 원본 색이 옅다) */
-.tv-readout-toggle {
-  flex-shrink: 0;
-  align-self: center;
-  position: relative;
-  width: 22px;
-  height: 22px;
-  margin-left: auto;
-  padding: 0;
-  border: none;
-  border-radius: 7px;
-  background: transparent;
-  cursor: pointer;
-}
-
-.tv-readout-toggle::before {
-  content: "";
-  position: absolute;
-  inset: 4px;
-  background-color: #8a93a6;
-  -webkit-mask: url("../../assets/visibility.svg") center / 14px 14px no-repeat;
-  mask: url("../../assets/visibility.svg") center / 14px 14px no-repeat;
-}
-
-.tv-readout-toggle:hover {
-  background: rgba(20, 32, 60, 0.06);
-}
-
-.tv-readout-toggle:hover::before {
-  background-color: var(--color-primary);
-}
-
-.tv-readout-toggle.off::before {
-  background-color: #b7bdca;
-  -webkit-mask-image: url("../../assets/visibility_off.svg");
-  mask-image: url("../../assets/visibility_off.svg");
-}
-
 /* 카드 하단 미니 추이 — 카드 좌우 끝까지 닿게 안쪽 여백만큼 밖으로 뺀다 */
 .tv-readout-spark {
   display: block;
   width: calc(100% + 20px);
   height: 26px;
   margin: 4px -10px 0;
-}
-
-/* 숨긴 채널은 흐리게 + 빗금 배경 */
-.tv-readout-row.is-hidden {
-  background: repeating-linear-gradient(135deg, #fafbfd 0 6px, #f4f6fa 6px 12px);
-}
-
-.tv-readout-row.is-hidden .tv-readout-dot,
-.tv-readout-row.is-hidden .tv-readout-name,
-.tv-readout-row.is-hidden .tv-readout-num,
-.tv-readout-row.is-hidden .tv-readout-unit,
-.tv-readout-row.is-hidden .tv-readout-spark {
-  opacity: 0.35;
 }
 
 /* ---------- 운전 상태 타임라인 (timelineRoot 안) ---------- */

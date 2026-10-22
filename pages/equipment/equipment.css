@@ -104,6 +104,15 @@ body.eq-modal-open {
 
 /* 압축기 전환 중 새 채널 설정을 불러오는 동안, 표를 비우지 않고 이전 내용을 옅게
    보여준다 — openCompressorDetail 참고. */
+/* 이벤트 상세의 "경보 범위 설정" 링크로 들어왔을 때 그 채널 줄 — 압축기를 바꾸면 표를 새로 그려 사라진다 */
+#cmChannelBody tr.eq-ch-target td {
+  background: #fff6e5;
+}
+
+#cmChannelBody tr.eq-ch-target td:first-child {
+  box-shadow: inset 3px 0 0 #f59f00;
+}
+
 #cmChannelBody.eq-channel-loading {
   opacity: 0.4;
   pointer-events: none;

@@ -24,19 +24,23 @@ async function apiRequestRaw(path, options = {}) {
     } catch {
       // 응답 본문을 못 읽어도 상태코드 기반 메시지로는 처리할 수 있으니 무시한다.
     }
-    // 서버 오류(5xx)에는 traceId가 실려 온다(백엔드 2026-09-28) — 서버 로그에서 이 요청을
-    // 바로 찾을 수 있는 번호라, 사용자에게 보이는 문구에 같이 붙여준다. 4xx는 원인이 이미
-    // 메시지에 있으므로 붙이지 않는다.
-    const traceId = parseTraceId(bodyText);
-    const message = parseErrorBody(bodyText) || `API 요청 실패 (${res.status})`;
-    const err = new Error(traceId && res.status >= 500 ? `${message} [추적번호: ${traceId}]` : message);
-    err.status = res.status;
-    err.traceId = traceId;
-    err.bodyText = bodyText; // 같은 상태코드라도 본문 모양으로 경우를 가를 때 쓴다(예: 비상정지 75번의 400)
-    throw err;
+    throw buildApiError(res.status, bodyText);
   }
 
   return res;
+}
+
+// 실패 응답 → Error. 서버 오류(5xx)에는 traceId가 실려 온다(백엔드 2026-09-28) — 서버 로그에서 이 요청을
+// 바로 찾을 수 있는 번호라, 사용자에게 보이는 문구에 같이 붙여준다. 4xx는 원인이 이미
+// 메시지에 있으므로 붙이지 않는다.
+function buildApiError(status, bodyText) {
+  const traceId = parseTraceId(bodyText);
+  const message = parseErrorBody(bodyText) || `API 요청 실패 (${status})`;
+  const err = new Error(traceId && status >= 500 ? `${message} [추적번호: ${traceId}]` : message);
+  err.status = status;
+  err.traceId = traceId;
+  err.bodyText = bodyText; // 같은 상태코드라도 본문 모양으로 경우를 가를 때 쓴다(예: 비상정지 75번의 400)
+  return err;
 }
 
 // BadRequest("메시지") 같은 응답은 그냥 문자열(JSON 문자열 리터럴)로 오거나, 검증 오류일
@@ -109,4 +113,34 @@ async function apiUpload(path, formData) {
   const res = await apiRequestRaw(path, { method: "POST", body: formData });
   const text = await res.text();
   return text ? JSON.parse(text) : null;
+}
+
+// apiUpload와 같지만 보낸 양을 onProgress(보낸 바이트, 전체 바이트)로 알려준다 — fetch는 보내는 쪽
+// 진행률을 주지 않아 XHR로 보낸다. 인증·오류 처리는 apiRequestRaw와 같다.
+function apiUploadWithProgress(path, formData, onProgress) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", APP_CONFIG.apiBaseUrl + path);
+    const session = getSession();
+    if (session && session.token) xhr.setRequestHeader("Authorization", "Bearer " + session.token);
+    xhr.upload.addEventListener("progress", (event) => {
+      if (event.lengthComputable && onProgress) onProgress(event.loaded, event.total);
+    });
+    xhr.addEventListener("error", () => reject(new Error("네트워크 오류로 업로드하지 못했습니다.")));
+    xhr.addEventListener("load", () => {
+      const text = xhr.responseText;
+      if (xhr.status === 401) {
+        clearSession();
+        window.location.href = "../login/login.html";
+        reject(new Error("인증이 만료되었습니다. 다시 로그인해 주세요."));
+        return;
+      }
+      if (xhr.status < 200 || xhr.status >= 300) {
+        reject(buildApiError(xhr.status, text));
+        return;
+      }
+      resolve(text ? JSON.parse(text) : null);
+    });
+    xhr.send(formData);
+  });
 }

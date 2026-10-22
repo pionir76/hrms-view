@@ -31,24 +31,50 @@ function fetchAttachments(ownerType, ownerId) {
   return apiFetch(`/api/attachments?ownerType=${ownerType}&ownerId=${ownerId}`);
 }
 
+// 업로드가 도는 동안 창을 닫거나 다른 페이지로 가려 하면 브라우저가 한 번 묻게 한다 —
+// 기다리지 않고 닫으면 파일이 올라가지 않은 채 끝난다(2026-10-22 고객사 "신고서 저장 안 됨" 문의)
+let attachmentUploadsInFlight = 0;
+window.addEventListener("beforeunload", (event) => {
+  if (attachmentUploadsInFlight === 0) return;
+  event.preventDefault();
+  event.returnValue = "";
+});
+
 // 한 번에 여러 개를 받는 API가 없어 파일 수만큼 호출한다. 용량이 큰 파일은 몇 초씩 걸려서
-// 스피너만 돌면 멈춘 것처럼 보이므로, 끝난 개수를 BUSY 문구로 갱신한다.
+// 스피너만 돌면 멈춘 것처럼 보이므로, 보낸 양(%)과 끝난 개수를 BUSY 문구로 갱신한다.
 // (호출하는 쪽이 withGlobalBusy로 감싸야 문구가 보인다.)
 async function uploadAttachments(ownerType, ownerId, files) {
   let uploaded = 0;
-  const showProgress = () => setGlobalBusyLabel(`첨부파일 업로드 중... (${uploaded}/${files.length})`);
+  const sent = files.map(() => 0);
+  const totalBytes = files.reduce((sum, f) => sum + f.size, 0) || 1;
+  const showProgress = () => {
+    const percent = Math.min(100, Math.floor((sent.reduce((a, b) => a + b, 0) / totalBytes) * 100));
+    const count = files.length > 1 ? ` (${uploaded}/${files.length})` : "";
+    setGlobalBusyLabel(`첨부파일 업로드 중... ${percent}%${count} — 창을 닫지 마세요`);
+  };
   showProgress();
-  await Promise.all(
-    files.map((file) => {
-      const formData = new FormData();
-      formData.append("file", file);
-      return apiUpload(`/api/attachments?ownerType=${ownerType}&ownerId=${ownerId}`, formData).then((res) => {
-        uploaded += 1;
-        showProgress();
-        return res;
-      });
-    })
-  );
+  attachmentUploadsInFlight += 1;
+  try {
+    await Promise.all(
+      files.map((file, i) => {
+        const formData = new FormData();
+        formData.append("file", file);
+        // 멀티파트 머리말만큼 total이 파일보다 조금 크다 — 파일 크기 비율로 환산한다
+        const onProgress = (loaded, total) => {
+          sent[i] = total > 0 ? (loaded / total) * file.size : 0;
+          showProgress();
+        };
+        return apiUploadWithProgress(`/api/attachments?ownerType=${ownerType}&ownerId=${ownerId}`, formData, onProgress).then((res) => {
+          sent[i] = file.size;
+          uploaded += 1;
+          showProgress();
+          return res;
+        });
+      })
+    );
+  } finally {
+    attachmentUploadsInFlight -= 1;
+  }
 }
 
 // Authorization 헤더가 필요해 <a href>로 바로 받을 수 없다 — Blob으로 받아 임시 링크로 내려받는다.

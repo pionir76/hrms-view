@@ -762,6 +762,12 @@
   min-width: 0;
 }
 
+/* 10MB 초과로 파일이 빠졌을 때 */
+.om-report.is-error {
+  border-color: #f2a3ae;
+  background: #fff7f8;
+}
+
 .om-report .org-file-chip {
   min-width: 0;
 }
