@@ -239,16 +239,16 @@ function renderCompressorSummary() {
 
 // ---------- 압축기 리스트 (채널 현재값 3초 갱신) ----------
 
-// 컬럼 순서: 압축기 | 흡입온도 ~ 운전전류(채널 7개) | 통신 상태.
+// 컬럼 순서: 압축기 | 토출압력 ~ 운전전류(채널 7개, DISPLAY_CHANNELS 순서) | 통신 상태.
 // 채널 머리글은 채널명만 보여주고(채널번호·단위 없음), 단위는 각 값 뒤에 붙인다.
 function populateCompressorTableHead() {
-  const channelHeaders = CHANNELS.map((ch) => `<th>${ch.label}</th>`).join("");
+  const channelHeaders = DISPLAY_CHANNELS.map((ch) => `<th>${ch.label}</th>`).join("");
   document.getElementById("compressorTableHeadRow").innerHTML = `<th>압축기</th>${channelHeaders}<th>통신 상태</th>`;
 }
 
 function renderCompressorTable() {
   const tbody = document.getElementById("compressorTableBody");
-  const colCount = 2 + CHANNELS.length;
+  const colCount = 2 + DISPLAY_CHANNELS.length;
 
   if (state.compressors.length === 0) {
     tbody.innerHTML = `<tr><td colspan="${colCount}"><div class="empty-state">등록된 압축기가 없습니다.</div></td></tr>`;
@@ -257,7 +257,7 @@ function renderCompressorTable() {
 
   tbody.innerHTML = state.compressors
     .map((c) => {
-      const channelCells = CHANNELS.map((ch) => `<td id="chval-${c.id}-${ch.no}">-</td>`).join("");
+      const channelCells = DISPLAY_CHANNELS.map((ch) => `<td id="chval-${c.id}-${ch.no}">-</td>`).join("");
       return `
         <tr class="clickable" data-id="${c.id}">
           <td>COMP #${c.sequenceNo}</td>
@@ -294,7 +294,7 @@ async function refreshChannelValues() {
         return; // 이 압축기만 조회 실패 — 기존 값을 유지하고 다음 주기에 재시도
       }
 
-      CHANNELS.forEach((ch) => {
+      DISPLAY_CHANNELS.forEach((ch) => {
         const cell = document.getElementById(`chval-${c.id}-${ch.no}`);
         if (!cell) return;
         const found = values.find((v) => v.channelNo === ch.no);

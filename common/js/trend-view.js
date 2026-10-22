@@ -1,6 +1,6 @@
 // 압축기 하루 트렌드 뷰 — 자료 조회 · 장비 실시간 화면 공통 컴포넌트
 //
-// 필요한 스크립트: channels.js(CHANNELS, CHANNEL_COLORS, MINUTES_PER_DAY, 소수점 변환),
+// 필요한 스크립트: channels.js(DISPLAY_CHANNELS, CHANNEL_COLORS, MINUTES_PER_DAY, 소수점 변환),
 //                 ui.js(minuteLabel, minuteOfDayKst, escapeHtml, hexToRgba), vendor/chart.umd.min.js
 // 필요한 스타일:   common/css/trend-view.css
 //
@@ -369,7 +369,7 @@ function createTrendView({ root, timelineRoot = null }) {
     slots: [],
     datasets: [],
     lastDataIndex: 0,
-    selectedChannel: CHANNELS[0].no,
+    selectedChannel: DISPLAY_CHANNELS[0].no,
     hiddenChannels: new Set(),
     // view는 지금 화면에 그려진 범위(애니메이션 중에는 중간값), viewTarget은 도착할 범위 —
     // 버튼을 연달아 누르면 도착점 기준으로 누적돼야 해서 둘을 따로 둔다
@@ -692,7 +692,7 @@ function createTrendView({ root, timelineRoot = null }) {
     }
     const commRanges = buildCommLossRanges(slots);
 
-    st.datasets = CHANNELS.map((ch) => {
+    st.datasets = DISPLAY_CHANNELS.map((ch) => {
       const setting = findChannelSetting(channelSettings, ch.no);
       const dp = setting ? setting.decimalPlaces : null;
       const key = ch.no.toLowerCase();
@@ -724,7 +724,7 @@ function createTrendView({ root, timelineRoot = null }) {
       chart.options.plugins.alarmRange.ranges = alarmRanges;
       chart.options.scales.x.min = st.view.min;
       chart.options.scales.x.max = st.view.max;
-      CHANNELS.forEach((ch) => {
+      DISPLAY_CHANNELS.forEach((ch) => {
         chart.options.scales[`y-${ch.no}`].ticks.precision = trendTickPrecision(st.decimalPlacesByChannel[ch.no]);
       });
       buildReadout(); // 압축기마다 채널명·단위가 다를 수 있다
@@ -749,7 +749,7 @@ function createTrendView({ root, timelineRoot = null }) {
 
   function createChart(commRanges, alarmRanges) {
     const yScales = {};
-    CHANNELS.forEach((ch) => {
+    DISPLAY_CHANNELS.forEach((ch) => {
       yScales[`y-${ch.no}`] = {
         display: ch.no === st.selectedChannel,
         grace: "10%",

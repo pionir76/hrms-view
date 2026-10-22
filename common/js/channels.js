@@ -13,6 +13,12 @@ const CHANNELS = [
   { no: "CH07", label: "운전전류", unit: "A" },
 ];
 
+// 화면 나열 순서(2026-10-22 고객사 요청) — 실시간 현황 장비 세부·자료 조회(트렌드)에서 쓴다.
+// 장비 관리의 채널 설정은 채널번호 순서(CHANNELS)를 그대로 쓴다.
+const DISPLAY_CHANNELS = ["CH05", "CH02", "CH04", "CH01", "CH06", "CH03", "CH07"].map((no) =>
+  CHANNELS.find((c) => c.no === no)
+);
+
 // 단위별 표시 소수점 자리수 기본값 — 백엔드 ChannelDefaults와 같은 값이다
 // (reference/Equipment/README.md: 압력 2자리, 온도·전압·전류 1자리).
 // 압축기를 새로 만들 때 서버가 이 기준으로 채널 설정을 채우므로, 아직 채널 설정을
