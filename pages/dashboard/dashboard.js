@@ -5,6 +5,7 @@
 //   GET /api/system/status      (71번) — 시스템 정보·서버 상태 카드. 30초마다
 //   GET /api/summary            (8번)  — 등록 전체·상태별 장비 수(미운영 표시). 30초마다
 //   GET /api/events?since=&take= (9번) — 하단 이벤트 티커. 5초마다 since 폴링
+//   (리스트 모드 "실시간 측정값" 보기는 79·80번 — dashboard-values.js)
 //
 // 화면 구성(사용자 결정):
 //   좌 상단: 운영 장비(+미운영 수) / 운전 중인 장비 / 통신 불량 장비(모두 장비 기준) 카드
@@ -45,6 +46,7 @@ const dbState = {
   newEventCount: 0,
   summary: null, // 8번 요약 API 응답(등록 전체·상태별 장비 수) — null이면 아직 모름
   eventCategory: "",
+  eventRegion: "", // 이벤트 목록 지구 필터("" = 전체, 예: "A 지구")
   panelOpen: false,
 };
 
@@ -58,6 +60,7 @@ function initDashboard() {
   document.getElementById("dbSearch").addEventListener("input", (event) => {
     dbState.keyword = event.target.value.trim();
     renderEquipmentList(true);
+    renderValuesTable(true);
   });
   document.getElementById("dbFilters").addEventListener("click", (event) => {
     const chip = event.target.closest("[data-filter]");
@@ -65,6 +68,7 @@ function initDashboard() {
     dbState.filter = chip.dataset.filter;
     renderFilters();
     renderEquipmentList(true);
+    renderValuesTable(true);
   });
   document.getElementById("dbRegions").addEventListener("click", (event) => {
     const row = event.target.closest("[data-equipment-id]");
@@ -82,6 +86,12 @@ function initDashboard() {
     dbState.eventCategory = chip.dataset.category;
     renderEventsPanel();
   });
+  document.getElementById("dbEventRegions").addEventListener("click", (event) => {
+    const chip = event.target.closest(".chip");
+    if (!chip) return;
+    dbState.eventRegion = chip.dataset.region;
+    renderEventsPanel();
+  });
   document.getElementById("dbEventsList").addEventListener("click", (event) => {
     const row = event.target.closest("[data-event-id]");
     if (!row) return;
@@ -95,6 +105,7 @@ function initDashboard() {
 
   document.getElementById("dbSysToggle").addEventListener("click", toggleSystemPanel);
   initDashboardMap(); // 리스트 / 맵 전환과 맵 조작(dashboard-map.js)
+  initDashboardValues(); // 리스트 모드의 운영 상태 / 실시간 측정값 보기 전환(dashboard-values.js)
 
   loadEquipments();
   setInterval(loadEquipments, EQUIPMENT_POLL_MS);
@@ -532,24 +543,48 @@ function toggleEventsPanel() {
   }
 }
 
+// 이벤트의 지구 — 장비 상태(70번)에서 찾고, 없으면(운영이 아니게 된 장비 등) 문구 앞의 지구 이름으로 찾는다
+// (서버 문구가 "C 지구 자동내구2동의 …"처럼 지구로 시작한다)
+function eventRegion(e, regions) {
+  const equipment = e.equipmentId ? dbState.equipments.find((x) => x.id === e.equipmentId) : null;
+  if (equipment) return equipment.region;
+  return regions.find((r) => String(e.message || "").startsWith(r)) || "";
+}
+
+// 지구(A·B·C) × 구분(경보·통신장애) 필터 — 사용자 결정 2026-10-27. 구분 칩은 경보·통신장애를 늘 보이고,
+// 비상정지는 목록에 있을 때만 붙인다. 각 칩의 건수는 다른 쪽 필터를 반영한 건수다.
+const DASHBOARD_EVENT_FILTER_CATEGORIES = ["Alarm", "Communication"];
+
 function renderEventsPanel() {
   if (!dbState.panelOpen) return;
-  const counts = {};
-  dbState.events.forEach((e) => (counts[e.category] = (counts[e.category] || 0) + 1));
-  if (dbState.eventCategory && !counts[dbState.eventCategory]) dbState.eventCategory = "";
-  const categories = ["", ...Object.keys(counts).sort()];
+  const regions = collectRegions(dbState.equipments);
+  if (dbState.eventRegion && !regions.includes(dbState.eventRegion)) dbState.eventRegion = "";
+  const tagged = dbState.events.map((e) => ({ e, region: eventRegion(e, regions) }));
+  const inRegion = (t) => !dbState.eventRegion || t.region === dbState.eventRegion;
+  const inCategory = (t) => !dbState.eventCategory || t.e.category === dbState.eventCategory;
+
+  document.getElementById("dbEventRegions").innerHTML = ["", ...regions]
+    .map((r) => {
+      const count = tagged.filter((t) => inCategory(t) && (!r || t.region === r)).length;
+      return `<button type="button" class="chip${r === dbState.eventRegion ? " active" : ""}" data-region="${escapeHtml(r)}">${escapeHtml(r || "전체 지구")}<em>${count}</em></button>`;
+    })
+    .join("");
+
+  const present = new Set(dbState.events.map((e) => e.category));
+  const categories = ["", ...DASHBOARD_EVENT_FILTER_CATEGORIES, ...[...present].filter((c) => !DASHBOARD_EVENT_FILTER_CATEGORIES.includes(c)).sort()];
+  if (dbState.eventCategory && !categories.includes(dbState.eventCategory)) dbState.eventCategory = "";
   document.getElementById("dbEventFilters").innerHTML = categories
     .map((cat) => {
       const label = cat === "" ? "전체" : EVENT_CATEGORY_LABEL[cat] || cat;
-      const count = cat === "" ? dbState.events.length : counts[cat];
+      const count = tagged.filter((t) => inRegion(t) && (!cat || t.e.category === cat)).length;
       return `<button type="button" class="chip${cat === dbState.eventCategory ? " active" : ""}" data-category="${cat}">${escapeHtml(label)}<em>${count}</em></button>`;
     })
     .join("");
 
-  const rows = dbState.eventCategory ? dbState.events.filter((e) => e.category === dbState.eventCategory) : dbState.events;
+  const rows = tagged.filter((t) => inRegion(t) && inCategory(t)).map((t) => t.e);
   document.getElementById("dbEventsList").innerHTML =
     rows.length === 0
-      ? `<div class="empty-state">최근 경보·통신 이벤트가 없습니다.</div>`
+      ? `<div class="empty-state">${dbState.events.length === 0 ? "최근 경보·통신 이벤트가 없습니다." : "조건에 맞는 이벤트가 없습니다."}</div>`
       : rows
           .map(
             (e) => `

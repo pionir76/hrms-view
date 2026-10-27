@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<title>실시간 측정값 시안</title>
+<link rel="stylesheet" href="../common/css/common.css" />
+<link rel="stylesheet" href="../pages/dashboard/dashboard.css" />
+<style>
+  /* 시안 전용 틀 — 실제 화면의 리스트 카드만 떼어 그린다. ?v=a(지구 3열 유지) / ?v=b(한 장 넓은 표) */
+  body { width: 1600px; padding: 20px 24px; background: var(--color-bg); }
+  .mk-cap { margin: 0 0 10px; font-size: 13px; font-weight: 800; color: #002c5f; }
+  .mk-cap small { margin-left: 8px; font-weight: 500; color: var(--color-text-muted); }
+  .db-list { height: 900px; display: flex; flex-direction: column; }
+
+  /* ===== 시안: 보기 전환(장비 운영 상태 / 실시간 측정값) — 장비 리스트 제목 바로 옆 ===== */
+  .vv-switch { display: inline-flex; padding: 3px; border-radius: 10px; background: #eef1f6; flex-shrink: 0; }
+  .vv-switch button {
+    border: none; background: none; padding: 5px 12px; border-radius: 8px;
+    font: inherit; font-size: 12.5px; font-weight: 700; color: var(--color-text-muted); cursor: pointer; white-space: nowrap;
+  }
+  .vv-switch button.on { background: #fff; color: var(--color-brand-navy); box-shadow: 0 1px 3px rgba(20, 32, 60, 0.12); }
+
+  /* 값 칸 공통 */
+  .vv-val { text-align: right; font-variant-numeric: tabular-nums; font-size: 12.5px; font-weight: 600; color: var(--color-text); white-space: nowrap; }
+  .vv-val.alarm { color: #c4142c; font-weight: 800; }
+  .vv-val.alarm span { padding: 1px 5px; border-radius: 5px; background: #ffe8eb; }
+  .vv-val.off { color: var(--color-text-faint); font-weight: 500; }
+  .vv-comm .vv-val { color: #b5bccb; }
+  .vv-seq {
+    display: inline-grid; place-items: center; min-width: 30px; height: 18px; padding: 0 5px;
+    border-radius: 5px; background: #eaeef4; box-shadow: inset 0 0 0 1px #d4dbe6;
+    font-size: 10.5px; font-weight: 800; color: #6a7489; font-variant-numeric: tabular-nums;
+  }
+  .vv-seq.alarm { background: #e0364d; box-shadow: none; color: #fff; }
+  .vv-seq.comm { background: #f79009; box-shadow: none; color: #fff; }
+
+  /* ----- A안: 지구 3열 유지 ----- */
+  .vv-grid { display: grid; grid-template-columns: 46px repeat(7, minmax(0, 1fr)); align-items: center; column-gap: 4px; }
+  .vv-colhead {
+    position: sticky; top: 0; z-index: 2; padding: 7px 8px 6px; background: #fff;
+    border-bottom: 1px solid var(--color-border); font-size: 11px; font-weight: 700; color: var(--color-text-muted);
+  }
+  .vv-colhead span { text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .vv-colhead span:first-child { text-align: left; }
+  .vv-a .db-bld-head { top: 31px; }
+  .vv-a .db-eq { padding: 6px 8px 3px; }
+  .vv-comprow { padding: 3px 8px; border-radius: 7px; }
+  .vv-comprow:hover { background: #f5f8ff; }
+  .vv-comprow + .db-eq { margin-top: 4px; }
+
+  /* ----- B안: 한 장 넓은 표 ----- */
+  .vv-b-wrap { flex: 1; min-height: 0; overflow: auto; }
+  .vv-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
+  .vv-table th {
+    position: sticky; top: 0; z-index: 2; padding: 9px 12px; background: #f8f9fc;
+    border-bottom: 1px solid var(--color-border); font-size: 11.5px; font-weight: 700; color: var(--color-text-muted);
+    text-align: right; white-space: nowrap;
+  }
+  .vv-table th small { margin-left: 3px; font-weight: 600; color: var(--color-text-faint); }
+  .vv-table th.l { text-align: left; }
+  .vv-table td { padding: 5px 12px; border-bottom: 1px solid var(--color-border-soft); }
+  .vv-table td.num { text-align: right; }
+  .vv-table tr.vv-region td { padding: 9px 12px 7px; background: #f3f5fa; font-size: 13.5px; font-weight: 800; border-bottom: 1px solid var(--color-border); }
+  .vv-table tr.vv-region td em { margin-left: 8px; font-style: normal; font-size: 12px; font-weight: 600; color: var(--color-text-muted); }
+  .vv-table td.vv-bld { font-size: 12px; font-weight: 800; color: #2f5bea; vertical-align: top; white-space: nowrap; }
+  .vv-table td.vv-eqname { vertical-align: top; white-space: nowrap; }
+  .vv-table td.vv-eqname .db-eq { padding: 0; gap: 8px; }
+  .vv-table tr.vv-first td { border-top: 1px solid var(--color-border-soft); }
+  .vv-table tbody tr:hover td:not(.vv-bld):not(.vv-eqname) { background: #f5f8ff; }
+</style>
+</head>
+<body>
+  <p class="mk-cap" id="cap"></p>
+  <div class="db-card db-list">
+    <div class="db-list-bar">
+      <h2 class="db-list-title">장비 리스트</h2>
+      <div class="vv-switch" role="tablist" aria-label="리스트 보기">
+        <button type="button">장비 운영 상태</button>
+        <button type="button" class="on">실시간 측정값</button>
+      </div>
+      <div class="db-filters">
+        <button type="button" class="db-fchip active">전체<em>149</em></button>
+        <button type="button" class="db-fchip d-run"><i></i>운전<em>149</em></button>
+        <button type="button" class="db-fchip d-stop"><i></i>정지<em>0</em></button>
+        <button type="button" class="db-fchip d-comm"><i></i>통신 불량<em>1</em></button>
+        <button type="button" class="db-fchip d-alarm"><i></i>경보<em>3</em></button>
+      </div>
+      <input type="search" class="db-search" placeholder="장비명·시설동 검색" />
+    </div>
+    <div id="body" style="flex: 1; min-height: 0; display: flex; flex-direction: column"></div>
+  </div>
+
+<script>
+  const SENSORS = [
+    ["토출압력", "MPa", 2], ["토출온도", "℃", 1], ["흡입압력", "MPa", 2], ["흡입온도", "℃", 1],
+    ["오일압력", "MPa", 2], ["오일온도", "℃", 1], ["운전전류", "A", 1],
+  ];
+  const DATA = {
+    "A 지구": [
+      ["차량시험동", [["수밀챔버 #1", 1], ["수밀챔버 #2", 1], ["시트컴포트(저온)&HOT챔버", 2], ["저온챔버 #1", 1], ["저온챔버 #2", 1], ["BSR #2", 2]]],
+      ["차량장비동", [["BSR #1", 2], ["BSR #3", 2]]],
+      ["PDI 1동", [["실차환경챔버 #2", 2]]],
+      ["PT 배기환경시험동", [["인증환경챔버 #1", 1], ["인증환경챔버 #2", 1], ["인증환경챔버 #3", 1]]],
+    ],
+    "B 지구": [
+      ["강설시험동", [["강설강우풍동 #1", 1], ["강설강우풍동 #2", 1], ["소크룸#2", 1], ["MAU/공조기", 1]]],
+      ["무향1동", [["디젤1실", 1]]],
+      ["배기1동", [["소크룸 #1", 1], ["소크룸 #2", 1], ["환경챔버 #1", 1], ["환경챔버 #2", 1]]],
+      ["배기2동", [["소크룸버", 1], ["환경챔버 #1", 1]]],
+    ],
+    "C 지구": [
+      ["고지환경시험동", [["실차고지챔버 #1", 1], ["실차고지챔버 #2", 1]]],
+      ["무향3동", [["무향실", 5]]],
+      ["배기3동", [["시험실 #1", 1], ["시험실 #10", 1], ["시험실 #2", 1], ["시험실 #3", 1]]],
+    ],
+  };
+  // 정해진 값(시안이 매번 같게) — 압축기마다 조금씩 다른 값
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 9301 + 49297) % 233280) / 233280);
+  const BASE = [2.1, 62, 0.42, 4.5, 2.6, 41, 32];
+  const SPREAD = [0.5, 25, 0.2, 12, 0.6, 12, 18];
+  function comp(i, label) {
+    const comm = label === "인증환경챔버 #3" && i === 1;
+    const alarmCh = label === "소크룸 #2" ? 1 : label === "무향실" && i === 4 ? 6 : label === "시트컴포트(저온)&HOT챔버" && i === 2 ? 0 : -1;
+    return {
+      seq: i, comm, alarm: alarmCh >= 0,
+      values: SENSORS.map((s, k) => ({ v: (BASE[k] + (rnd() - 0.5) * SPREAD[k]).toFixed(s[2]), alarm: k === alarmCh })),
+    };
+  }
+  const v = new URLSearchParams(location.search).get("v") || "a";
+  const esc = (t) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  const eqRow = (name, comps, inTable) => {
+    const comm = comps.some((c) => c.comm);
+    const alarm = comps.some((c) => c.alarm);
+    return `<div class="db-eq"><span class="db-dot ${comm ? "d-comm" : "d-run run"}"></span><span class="db-eq-name">${esc(name)}</span>${
+      inTable ? "" : `<span class="db-onoff comm${comm ? " on" : ""}">통신</span><span class="db-onoff alarm${alarm ? " on" : ""}">경보</span>`
+    }</div>`;
+  };
+  const seqHtml = (c) => `<span class="vv-seq${c.comm ? " comm" : c.alarm ? " alarm" : ""}">#${c.seq}</span>`;
+  const valHtml = (x) => `<span class="vv-val${x.alarm ? " alarm" : ""}"><span>${x.v}</span></span>`;
+
+  const body = document.getElementById("body");
+  if (v === "a") {
+    document.getElementById("cap").innerHTML = "A안 — 지구 3열 유지<small>장비명 아래 압축기마다 한 줄, 센서 이름은 지구 열마다 맨 위 한 줄(스크롤해도 고정)</small>";
+    body.innerHTML = `<div class="db-regions vv-a" style="flex:1">${Object.entries(DATA).map(([region, blds]) => `
+      <div class="db-region">
+        <div class="db-region-head"><b>${region}</b><span class="db-region-cnt">${blds.reduce((n, b) => n + b[1].length, 0)}대</span>
+          <span class="db-region-mini"><span class="d-run"><i></i>운전<b>${blds.reduce((n, b) => n + b[1].length, 0)}</b></span><span class="d-comm"><i></i>통신<b>${region === "A 지구" ? 1 : 0}</b></span><span class="d-alarm"><i></i>경보<b>1</b></span></span></div>
+        <div class="db-region-body" style="padding-top:0">
+          <div class="vv-grid vv-colhead"><span>압축기</span>${SENSORS.map((s) => `<span title="${s[0]} (${s[1]})">${s[0]}</span>`).join("")}</div>
+          ${blds.map(([bld, eqs]) => `<div class="db-bld"><div class="db-bld-head">${bld}<em>${eqs.length}</em></div>${eqs.map(([name, n]) => {
+            const comps = Array.from({ length: n }, (_, i) => comp(i + 1, name));
+            return eqRow(name, comps, false) + comps.map((c) => `<div class="vv-grid vv-comprow${c.comm ? " vv-comm" : ""}">${seqHtml(c)}${c.values.map(valHtml).join("")}</div>`).join("");
+          }).join("")}</div>`).join("")}
+        </div>
+      </div>`).join("")}</div>`;
+  } else {
+    document.getElementById("cap").innerHTML = "B안 — 한 장 넓은 표<small>지구 → 시설동 → 장비 → 압축기 순서로 한 줄씩, 센서 이름·단위는 표 맨 위 한 줄(스크롤해도 고정)</small>";
+    const rows = Object.entries(DATA).map(([region, blds]) => {
+      const n = blds.reduce((k, b) => k + b[1].length, 0);
+      return `<tr class="vv-region"><td colspan="10">${region}<em>${n}대 · 시설동 ${blds.length}</em></td></tr>` + blds.map(([bld, eqs]) => {
+        const all = eqs.map(([name, k]) => ({ name, comps: Array.from({ length: k }, (_, i) => comp(i + 1, name)) }));
+        const bldRows = all.reduce((k, e) => k + e.comps.length, 0);
+        return all.map((e, ei) => e.comps.map((c, ci) => `<tr class="${ci === 0 ? "vv-first" : ""}${c.comm ? " vv-comm" : ""}">
+            ${ei === 0 && ci === 0 ? `<td class="vv-bld" rowspan="${bldRows}">${bld}</td>` : ""}
+            ${ci === 0 ? `<td class="vv-eqname" rowspan="${e.comps.length}">${eqRow(e.name, e.comps, true)}</td>` : ""}
+            <td>${seqHtml(c)}</td>${c.values.map((x) => `<td class="num">${valHtml(x)}</td>`).join("")}</tr>`).join("")).join("");
+      }).join("");
+    }).join("");
+    body.innerHTML = `<div class="vv-b-wrap"><table class="vv-table">
+      <thead><tr><th class="l">시설동</th><th class="l">장비</th><th class="l">압축기</th>${SENSORS.map((s) => `<th>${s[0]}<small>${s[1]}</small></th>`).join("")}</tr></thead>
+      <tbody>${rows}</tbody></table></div>`;
+  }
+</script>
+</body>
+</html>

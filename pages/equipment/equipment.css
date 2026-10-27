@@ -1143,3 +1143,327 @@ body.eq-modal-open {
 .eq-repair-approval-section {
   margin-bottom: 16px;
 }
+
+/* ---------- 검사이력 일괄등록 (equipment-bulk-inspection.js, 시안 mokup/inspection_bulk_v1) ----------
+   대상 장비 선택은 조직 관리 "담당장비" 선택(org.css .om-*)과 같은 모양이다 — 페이지가 달라 스타일을 bk-로 따로 둔다. */
+
+.bk-box {
+  width: min(1180px, calc(100vw - 48px));
+}
+
+.bk-split {
+  display: grid;
+  grid-template-columns: 420px minmax(0, 1fr);
+  gap: 22px;
+  min-height: 0;
+}
+
+/* 작성 / 결과 중 하나만 — display:grid가 hidden 속성을 덮지 않게 */
+.bk-split[hidden],
+.bk-result[hidden] {
+  display: none;
+}
+
+.bk-form .field {
+  margin-bottom: 12px;
+}
+
+.bk-note {
+  margin: 4px 0 0;
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: #f5f8ff;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-text-sub);
+}
+
+.bk-targets {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding-left: 22px;
+  border-left: 1px solid var(--color-border-soft);
+}
+
+.bk-targets-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.bk-targets-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 13.5px;
+  white-space: nowrap;
+}
+
+.bk-targets-title::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-grad);
+}
+
+.bk-count {
+  padding: 2px 9px;
+  border-radius: 99px;
+  background: #eef3ff;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--color-primary);
+  white-space: nowrap;
+}
+
+.bk-all {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-text-sub);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.bk-all:hover {
+  background: #f2f4f7;
+}
+
+.bk-all:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.bk-all .bk-cb {
+  pointer-events: none;
+}
+
+.bk-search {
+  width: 200px;
+  height: 34px;
+  border-radius: 10px;
+}
+
+.bk-groups {
+  height: 470px;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  align-content: start;
+  align-items: start;
+  padding-right: 4px;
+}
+
+.bk-empty {
+  grid-column: 1 / -1;
+  padding: 18px;
+  font-size: 12.5px;
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+.bk-group {
+  border: 1px solid var(--color-border-soft);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.bk-group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+}
+
+.bk-group-name {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.bk-group-name span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bk-group-name em {
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.bk-chevron {
+  width: 7px;
+  height: 7px;
+  border-right: 1.6px solid #a3abbb;
+  border-bottom: 1.6px solid #a3abbb;
+  transform: rotate(45deg) translate(-2px, -2px);
+  transition: transform 0.15s ease;
+}
+
+.bk-group.expanded .bk-chevron {
+  transform: rotate(-135deg) translate(-1px, -1px);
+}
+
+.bk-group-items {
+  display: none;
+  padding: 0 10px 8px 33px;
+}
+
+.bk-group.expanded .bk-group-items {
+  display: grid;
+  gap: 4px;
+}
+
+.bk-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--color-text-sub);
+  cursor: pointer;
+}
+
+.bk-item input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--color-primary);
+}
+
+/* 시설동·전체 선택 체크 — 전부(on) / 일부(part) / 없음 */
+.bk-cb {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 1.5px solid #c7cedb;
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.bk-cb.on {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+}
+
+.bk-cb.on::after {
+  content: "";
+  width: 7px;
+  height: 4px;
+  border-bottom: 2px solid #fff;
+  border-left: 2px solid #fff;
+  transform: rotate(-45deg) translate(1px, -1px);
+}
+
+.bk-cb.part {
+  border-color: var(--color-primary);
+}
+
+.bk-cb.part::after {
+  content: "";
+  width: 8px;
+  height: 2px;
+  background: var(--color-primary);
+}
+
+.bk-excluded {
+  margin: 8px 0 0;
+  font-size: 11.5px;
+  color: var(--color-text-faint);
+}
+
+.bk-summary {
+  margin-right: auto;
+  font-size: 12.5px;
+  color: var(--color-text-muted);
+}
+
+.bk-summary b {
+  color: var(--color-text);
+}
+
+/* 등록 결과 */
+.bk-result-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.bk-result-count {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--color-brand-navy);
+}
+
+.bk-result-count small {
+  font-size: 14px;
+  color: var(--color-text-muted);
+}
+
+.bk-bar {
+  height: 8px;
+  margin-bottom: 16px;
+  border-radius: 99px;
+  background: #eef1f6;
+  overflow: hidden;
+}
+
+.bk-bar i {
+  display: block;
+  height: 100%;
+  background: var(--accent-grad);
+}
+
+.bk-fail {
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  border: 1px solid #f6c7cd;
+  border-radius: 10px;
+  background: #fff7f8;
+}
+
+.bk-fail h4 {
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: #c4142c;
+}
+
+.bk-fail li {
+  margin: 2px 0;
+  font-size: 12.5px;
+  color: var(--color-text-sub);
+}
+

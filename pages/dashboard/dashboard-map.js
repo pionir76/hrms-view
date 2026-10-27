@@ -107,15 +107,19 @@ function initDashboardMap() {
   setDashboardMode(params.get("mode") === "list" ? "list" : "map");
 }
 
-// 지금 보기(리스트 / 맵 + 지구 탭)를 주소에 남긴다 — 새로고침·뒤로 가기에도 같은 보기로 돌아오게(히스토리는 늘리지 않음)
+// 지금 보기(리스트 / 맵 + 지구 탭, 리스트면 운영 상태 / 실시간 측정값)를 주소에 남긴다 —
+// 새로고침·뒤로 가기에도 같은 보기로 돌아오게(히스토리는 늘리지 않음)
 function syncDashboardUrl() {
   const url = new URL(window.location.href);
   if (mapState.active) {
     url.searchParams.set("mode", "map");
     url.searchParams.set("tab", mapState.tab);
+    url.searchParams.delete("view");
   } else {
     url.searchParams.set("mode", "list"); // 기본이 맵이라 리스트는 주소에 남겨야 돌아올 때 리스트로 열린다
     url.searchParams.delete("tab");
+    if (valuesState.view === "values") url.searchParams.set("view", "values");
+    else url.searchParams.delete("view");
   }
   window.history.replaceState(null, "", url);
 }
@@ -130,7 +134,9 @@ function setDashboardMode(mode) {
   });
   document.querySelector(".db-col-left").classList.toggle("is-map", map);
   syncDashboardUrl();
+  syncValuesPolling(); // 실시간 측정값 보기는 리스트 모드에서만 3초 갱신(dashboard-values.js)
   if (map) showDashboardMap();
+  else renderValuesTable(true);
 }
 
 async function showDashboardMap() {

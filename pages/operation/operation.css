@@ -262,6 +262,13 @@
   white-space: normal;
 }
 
+/* 구분·사용장비는 문구의 <br>에서만 줄을 나눈다 — "누설감지 / 기", "육안/온도계/ ⏎ 누설감지기"처럼 갈라지던 것(2026-10-27).
+   한 줄이 들어가도록 사용장비 칸을 175px로 넓혔다(실측 기준 190 → 165px) */
+.op-division,
+.op-equipment {
+  white-space: nowrap;
+}
+
 .op-sub {
   color: var(--color-text-muted);
   font-size: 12px;

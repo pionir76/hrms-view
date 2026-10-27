@@ -224,6 +224,12 @@ function writeExcelSheet(workbook, { name, title, info = [], approvals = [], tab
 async function exportLogToExcel({ fileName, sheets }) {
   const workbook = new ExcelJS.Workbook();
   sheets.forEach((s) => writeExcelSheet(workbook, s));
+  await downloadExcelWorkbook(workbook, fileName);
+}
+
+// 다 만든 통합문서를 .xlsx로 내려받는다 — 화면 표를 옮기는 일지 저장과, 시트를 직접 채우는
+// 자료 조회 트렌드 저장(pages/trend/trend.js)이 같이 쓴다.
+async function downloadExcelWorkbook(workbook, fileName) {
   const buffer = await workbook.xlsx.writeBuffer();
   const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
   const url = URL.createObjectURL(blob);

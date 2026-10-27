@@ -704,7 +704,9 @@ body.page-dashboard {
   box-shadow: 0 0 0 4px rgba(79, 110, 255, 0.14);
 }
 
+/* 상태 칩은 오른쪽으로 붙여 검색창 바로 왼쪽에 둔다(사용자 결정 2026-10-27) */
 .db-filters {
+  margin-left: auto;
   display: flex;
   flex-wrap: nowrap;
   gap: 6px;
@@ -756,7 +758,6 @@ body.page-dashboard {
 }
 
 .db-list-bar .db-search {
-  margin-left: auto;
   width: 240px;
   min-width: 140px;
   height: 32px;
@@ -1046,6 +1047,253 @@ body.page-dashboard {
 .d-comm { --dot: #f59f00; }
 .d-alarm { --dot: #e0364d; }
 
+/* ---------- 리스트 보기 전환 + 실시간 측정값 표 (dashboard-values.js, 시안 mokup/dashboard_values_v2) ---------- */
+
+.db-view-switch {
+  flex-shrink: 0;
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 10px;
+  background: #eef1f6;
+}
+
+.db-view-switch button {
+  padding: 5px 12px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.db-view-switch button:hover {
+  color: var(--color-text);
+}
+
+.db-view-switch button.on {
+  background: #fff;
+  color: var(--color-brand-navy);
+  box-shadow: 0 1px 3px rgba(20, 32, 60, 0.12);
+}
+
+/* 보기에 따라 지구 3열 / 측정값 표 중 하나만 */
+.db-values {
+  display: none;
+}
+
+.db-list.is-values .db-regions {
+  display: none;
+}
+
+.db-list.is-values .db-values {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.dv-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-width: thin;
+}
+
+.dv-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+}
+
+.dv-table th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 9px 10px;
+  background: #f8f9fc;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--color-text-sub);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.dv-table th small {
+  margin-left: 3px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--color-text-faint);
+}
+
+.dv-table th.l {
+  text-align: left;
+}
+
+.dv-table th.c,
+.dv-table td.c {
+  text-align: center;
+}
+
+.dv-table td {
+  padding: 5px 10px;
+  border-bottom: 1px solid var(--color-border-soft);
+  white-space: nowrap;
+}
+
+.dv-table td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.dv-table td.ip {
+  text-align: right;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-sub);
+}
+
+.dv-table tr.dv-region td {
+  padding: 9px 10px 7px;
+  background: #f3f5fa;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 13.5px;
+  font-weight: 800;
+}
+
+.dv-table tr.dv-region td em {
+  margin-left: 8px;
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.dv-table td.dv-bld {
+  vertical-align: top;
+  font-size: 12px;
+  font-weight: 800;
+  color: #2f5bea;
+}
+
+.dv-table td.dv-eqname {
+  max-width: 240px;
+  vertical-align: top;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dv-table td.dv-eqname .db-emg {
+  margin-left: 6px;
+}
+
+.dv-table td.dv-none {
+  color: var(--color-text-faint);
+  font-size: 12px;
+}
+
+.dv-table tr.dv-first td {
+  border-top: 1px solid var(--color-border-soft);
+}
+
+/* 값 옆 단위 — 숫자보다 작고 옅게 */
+.dv-unit {
+  margin-left: 3px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--color-text-faint);
+}
+
+/* 행을 누르면 그 줄만 강조(이동 없음) — 시설동·장비명 칸(세로 합침)은 칠하지 않는다 */
+.dv-table tbody tr[data-row-key] {
+  cursor: pointer;
+}
+
+.dv-table tbody tr[data-row-key]:hover td:not(.dv-bld):not(.dv-eqname),
+.dv-table tbody tr[data-row-key]:focus-visible td:not(.dv-bld):not(.dv-eqname) {
+  background: #f5f8ff;
+}
+
+.dv-table tbody tr[data-row-key]:focus-visible {
+  outline: none;
+}
+
+.dv-table tbody tr.is-selected td:not(.dv-bld):not(.dv-eqname),
+.dv-table tbody tr.is-selected:hover td:not(.dv-bld):not(.dv-eqname) {
+  background: #e3ebff;
+}
+
+.dv-table tbody tr.is-selected td:nth-last-child(1) {
+  box-shadow: inset -3px 0 0 #2f5bea;
+}
+
+/* 압축기 번호 — 경보 빨강 / 통신 불능 주황(장비 운영 상태 보기의 램프와 같은 색) */
+.dv-seq {
+  display: inline-grid;
+  place-items: center;
+  min-width: 30px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 5px;
+  background: #eaeef4;
+  box-shadow: inset 0 0 0 1px #d4dbe6;
+  font-size: 10.5px;
+  font-weight: 800;
+  color: #6a7489;
+  font-variant-numeric: tabular-nums;
+}
+
+.dv-seq.alarm {
+  background: #e0364d;
+  box-shadow: none;
+  color: #fff;
+}
+
+.dv-seq.comm {
+  background: #f79009;
+  box-shadow: none;
+  color: #fff;
+}
+
+.dv-tag {
+  display: inline-block;
+  min-width: 38px;
+  padding: 1px 7px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.dv-tag.run { background: #e6f7f1; color: #0f9467; }
+.dv-tag.stop { background: #eef1f6; color: #6a7489; }
+.dv-tag.alarm { background: #e0364d; color: #fff; }
+.dv-tag.normal { background: #f1f3f8; color: #8a93a6; }
+.dv-tag.unknown { background: #f1f3f8; color: #b5bccb; }
+.dv-tag.ok { background: #eef3ff; color: #2f5bea; }
+.dv-tag.fail { background: #fff3e0; color: #c25e00; }
+
+/* 경보 중인 채널 값 */
+.dv-table td.dv-alarm span {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: #ffe8eb;
+  color: #c4142c;
+  font-weight: 800;
+}
+
+/* 통신 불능 — 값이 마지막 값에서 멈춰 있어 흐리게 */
+.dv-table tr.dv-comm td.num {
+  color: #b5bccb;
+}
+
 /* ---------- 하단 이벤트 티커 ---------- */
 
 .db-ticker {
@@ -1252,6 +1500,14 @@ body.page-dashboard {
 .db-events-head b {
   font-size: 14px;
   white-space: nowrap;
+}
+
+/* 지구 필터와 구분 필터 사이 세로 구분선 */
+.db-events-sep {
+  flex-shrink: 0;
+  width: 1px;
+  height: 18px;
+  background: var(--color-border);
 }
 
 .db-events-hint {

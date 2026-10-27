@@ -67,10 +67,18 @@
           <div class="db-card db-list">
             <div class="db-list-bar">
               <h2 class="db-list-title">장비 리스트</h2>
+              <!-- 리스트 보기 전환 — 장비 운영 상태(지구 3열) / 실시간 측정값(압축기별 센서값 표, dashboard-values.js) -->
+              <div class="db-view-switch" id="dbViewSwitch" role="tablist" aria-label="리스트 보기">
+                <button type="button" data-view="status" role="tab" aria-selected="true" class="on">장비 운영 상태</button>
+                <button type="button" data-view="values" role="tab" aria-selected="false">실시간 측정값</button>
+              </div>
               <div class="db-filters" id="dbFilters"></div>
               <input type="search" class="db-search" id="dbSearch" placeholder="장비명·시설동 검색" />
             </div>
             <div class="db-regions" id="dbRegions">
+              <div class="empty-state">불러오는 중...</div>
+            </div>
+            <div class="db-values" id="dbValues">
               <div class="empty-state">불러오는 중...</div>
             </div>
           </div>
@@ -191,7 +199,10 @@
   <div class="db-events-panel" id="dbEventsPanel" hidden>
     <div class="db-events-head">
       <b>이벤트 (경보 · 통신장애)</b>
-      <div class="chip-group" id="dbEventFilters"></div>
+      <!-- 지구 필터와 구분 필터는 함께 걸린다(건수도 서로의 선택을 반영) -->
+      <div class="chip-group" id="dbEventRegions" aria-label="지구"></div>
+      <span class="db-events-sep" aria-hidden="true"></span>
+      <div class="chip-group" id="dbEventFilters" aria-label="구분"></div>
       <span class="db-events-hint">내용을 누르면 상세 정보가 열립니다</span>
     </div>
     <div class="db-events-list" id="dbEventsList"></div>
@@ -215,6 +226,7 @@
   <script src="../../common/js/event-log.js"></script>
   <script src="dashboard.js"></script>
   <script src="dashboard-map.js"></script>
+  <script src="dashboard-values.js"></script>
   <script>
     requireAuth();
     renderLayout();

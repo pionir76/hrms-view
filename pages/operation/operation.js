@@ -23,7 +23,7 @@ const OPERATION_NOTE_TEXT = [
 const OPERATION_CATALOG = [
   {
     division: "냉매계통",
-    equipmentLabel: "육안/온도계·누설감지기<br>모니터링시스템",
+    equipmentLabel: "육안/온도계/누설감지기<br>모니터링시스템", // 줄은 <br>에서만 나눈다(사용자 결정 2026-10-27)
     items: [
       { key: "토출압력", label: "토출압력", kind: "auto", perCompressor: true, channelNo: "CH05", refKey: "토출압력", defaultRef: "1.8MPa 이하" },
       { key: "토출가스온도", label: "토출가스온도", kind: "auto", perCompressor: true, channelNo: "CH02", refKey: "토출가스온도", defaultRef: "80℃ 이하" },
@@ -34,7 +34,7 @@ const OPERATION_CATALOG = [
     ],
   },
   {
-    division: "냉수/냉각수계통",
+    division: "냉수<br>냉각수계통", // 표시 전용 문구 — 줄은 <br>에서만 나눈다(사용자 결정 2026-10-27)
     equipmentLabel: "온도계/모니터링시스템",
     items: [
       {
@@ -607,10 +607,10 @@ function renderModalBody() {
       <table class="data-table op-table">
         <colgroup>
           <col style="width: 88px" />
-          <col style="width: 130px" />
+          <col style="width: 175px" />
           <col style="width: 150px" />
           <col style="width: 76px" />
-          <col style="width: 190px" />
+          <col style="width: 165px" />
           ${TIME_SLOT_LABELS.map(() => `<col style="width: 92px" />`).join("")}
         </colgroup>
         <thead>

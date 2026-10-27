@@ -102,8 +102,12 @@ async function apiFetch(path, options = {}) {
 // 이미지 등 바이너리 응답(예: GET /api/attachments/{id})을 받을 때 쓴다. 이런 API도
 // 다른 API와 동일하게 Authorization 헤더가 필요해서 <img src="...">에 URL을 직접 못
 // 넣는다 — 이걸로 받은 Blob을 URL.createObjectURL()로 변환해서 <img>에 넣어야 한다.
+//
+// 브라우저 캐시를 쓰지 않는다(2026-10-27). 장비 사진처럼 같은 칸에 다시 올리면 서버가 첨부 id를 그대로 두고
+// 파일만 바꾸는데, 응답에 Cache-Control이 없어 브라우저가 Last-Modified만 보고 오래된 사진일수록 길게(수정 후
+// 5일이면 약 12시간) 다시 묻지 않고 예전 사진을 보여줬다 — 창을 다시 열어도, 받기를 해도 교체 전 사진이었다.
 async function apiFetchBlob(path) {
-  const res = await apiRequestRaw(path);
+  const res = await apiRequestRaw(path, { cache: "no-store" });
   return res.blob();
 }
 

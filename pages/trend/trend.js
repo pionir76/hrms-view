@@ -6,6 +6,8 @@
 //   그날 가동율  GET /api/equipments/{id}/utilization?from= (7번)
 //   그날 이벤트  GET /api/equipments/{id}/events?date=     (58번, 페이징 없음)
 //
+// 엑셀 저장(2026-10-27)은 조회 때 받아둔 값만 쓴다 — 추가 요청 없이 압축기마다 시트 하나.
+//
 // 트렌드 그래프·운전 상태 타임라인은 common/js/trend-view.js, 이벤트 표·상세 팝업은
 // common/js/event-log.js 공통 컴포넌트가 그린다(장비 실시간 화면과 공유). 이 파일은 조회 조건,
 // 요약 타일, 압축기 탭과 데이터 불러오기만 맡는다.
@@ -21,6 +23,7 @@ const state = {
   // 남짓이라(측정값) 탭 전환마다 요청하는 것보다 훨씬 매끄럽다.
   // Map<compressorId, { points, channelSettings } | { error }>
   trendByCompressor: new Map(),
+  utilization: null, // 그날 가동율(7번 응답) — 엑셀 머리에도 쓴다
   events: [], // 그날 전체 이벤트(최신 먼저)
   alarmRanges: [], // buildAlarmRanges 결과(전 압축기)
 };
@@ -36,6 +39,7 @@ function initDataQueryPage() {
   document.getElementById("dqEquipment").addEventListener("change", updateSearchButtonState);
   document.getElementById("dqDate").addEventListener("change", updateSearchButtonState);
   document.getElementById("dqSearchBtn").addEventListener("click", runQuery);
+  document.getElementById("dqExcelBtn").addEventListener("click", exportTrendExcel);
   document.getElementById("dqPrevDay").addEventListener("click", () => shiftDate(-1));
   document.getElementById("dqNextDay").addEventListener("click", () => shiftDate(1));
 
@@ -142,6 +146,7 @@ async function runQuery() {
   if (!equipmentId || !date) return;
 
   document.getElementById("dqError").hidden = true;
+  document.getElementById("dqExcelBtn").disabled = true; // 새 조회가 끝나기 전엔 예전 결과를 저장하지 않게
   state.equipment = state.equipments.find((e) => String(e.id) === String(equipmentId));
   state.date = date;
 
@@ -154,6 +159,7 @@ async function runQuery() {
       ]);
 
       state.compressors = compressors.slice().sort((a, b) => a.sequenceNo - b.sequenceNo);
+      state.utilization = utilization;
       state.events = events;
       state.alarmRanges = buildAlarmRanges(events, alarmOpenEndMinute(date));
       state.selectedCompressorId = state.compressors.length > 0 ? state.compressors[0].id : null;
@@ -171,6 +177,7 @@ async function runQuery() {
 
   document.getElementById("dqEmpty").hidden = true;
   document.getElementById("dqResult").hidden = false;
+  document.getElementById("dqExcelBtn").disabled = state.compressors.length === 0;
 
   trendView.resetView(); // 날짜·장비가 바뀌었으니 하루 전체 보기로 시작한다
 
@@ -278,6 +285,132 @@ function showTrend(compressorId) {
   } else {
     trendView.setData({ points: entry.points, channelSettings: entry.channelSettings, alarmRanges, label });
   }
+}
+
+// ---------- 엑셀 저장 (2026-10-27 고객사 요청) ----------
+//
+// 조회한 장비·날짜의 하루 트렌드를 압축기마다 시트 하나로 저장한다(시트 이름 "COMP #1" …).
+//   - 위쪽: 장비·기록 정보 — 지역·시설동·장비명(관리번호)·위치 / 압축기·날짜 / 기록 분·통신장애 분 / 가동율·출력
+//   - 아래: 시각 + 센서 측정값 7열(화면과 같은 DISPLAY_CHANNELS 순서, 이름·단위는 그 압축기의 채널 설정).
+//     00:00~23:59 1,440행 고정이고, 기록이 없는 분(또는 값이 없는 채널)은 "-"(사용자 결정).
+//     값은 원시값에 소수점 자리수를 적용한 숫자 셀이라 엑셀에서 바로 계산·그래프가 된다.
+// 운전·경보·통신 상태 열은 넣지 않는다(사용자 결정 — 센서 측정값만). 통신장애는 머리의 분 수로만 알린다.
+const TREND_EXCEL_COLUMNS = 1 + DISPLAY_CHANNELS.length; // 시각 + 센서 7개
+const TREND_EXCEL_WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+const TREND_EXCEL_LABEL_FILL = "FFF8F9FC";
+const TREND_EXCEL_HEADER_FILL = "FFF1F3F8";
+
+async function exportTrendExcel() {
+  if (!state.equipment || !state.date || state.compressors.length === 0) return;
+  const e = state.equipment;
+  try {
+    await withGlobalBusy(
+      async () => {
+        const workbook = new ExcelJS.Workbook();
+        state.compressors.forEach((c) => writeTrendSheet(workbook, c));
+        await downloadExcelWorkbook(workbook, excelFileName(["트렌드", e.region, e.name, state.date]));
+      },
+      { label: "엑셀 파일 만드는 중..." }
+    );
+  } catch (err) {
+    showError(`엑셀 파일을 만들지 못했습니다. (${err.message})`);
+  }
+}
+
+function writeTrendSheet(workbook, compressor) {
+  const sheet = workbook.addWorksheet(`COMP #${compressor.sequenceNo}`, {
+    pageSetup: { orientation: "portrait", paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
+  });
+  sheet.getColumn(1).width = 9;
+  for (let col = 2; col <= TREND_EXCEL_COLUMNS; col += 1) sheet.getColumn(col).width = 14;
+
+  const entry = state.trendByCompressor.get(compressor.id);
+  const slots = entry && !entry.error ? buildDailySlots(entry.points) : new Array(MINUTES_PER_DAY).fill(null);
+  writeTrendSheetHead(sheet, compressor, slots);
+
+  if (!entry || entry.error) {
+    const row = sheet.addRow([`트렌드를 불러오지 못했습니다.${entry && entry.error ? ` (${entry.error})` : ""}`]);
+    sheet.mergeCells(row.number, 1, row.number, TREND_EXCEL_COLUMNS);
+    applyExcelCell(row.getCell(1), { align: "left" });
+    return;
+  }
+
+  // 머리글 — "토출압력 (MPa)"처럼 채널명 + 단위
+  const columns = DISPLAY_CHANNELS.map((ch) => {
+    const setting = findChannelSetting(entry.channelSettings, ch.no);
+    return {
+      key: ch.no.toLowerCase(),
+      label: (setting && setting.channelName) || ch.label,
+      unit: (setting && setting.unit) || ch.unit,
+      dp: setting ? setting.decimalPlaces : null,
+    };
+  });
+  const headerRow = sheet.addRow(["시각", ...columns.map((c) => `${c.label} (${c.unit})`)]);
+  headerRow.eachCell((cell) => applyExcelCell(cell, { bold: true, fill: TREND_EXCEL_HEADER_FILL }));
+  headerRow.height = 22;
+
+  for (let minute = 0; minute < MINUTES_PER_DAY; minute += 1) {
+    const point = slots[minute];
+    const values = columns.map((c) => {
+      const v = point ? toActualValue(point[c.key], c.dp) : null;
+      return v === null || v === undefined ? "-" : v;
+    });
+    const row = sheet.addRow([minuteLabel(minute), ...values]);
+    row.eachCell((cell, col) => {
+      applyExcelCell(cell, { align: col === 1 || cell.value === "-" ? "center" : "right" });
+      const dp = col > 1 ? columns[col - 2].dp : null;
+      if (typeof cell.value === "number" && dp !== null && dp !== undefined) cell.numFmt = dp > 0 ? `0.${"0".repeat(dp)}` : "0";
+    });
+  }
+
+  sheet.views = [{ state: "frozen", ySplit: headerRow.number }]; // 머리글까지 고정
+  sheet.autoFilter = { from: { row: headerRow.number, column: 1 }, to: { row: headerRow.number, column: TREND_EXCEL_COLUMNS } };
+}
+
+// 제목 + 정보 5줄(왼쪽 라벨·값, 오른쪽 라벨·값) + 빈 줄
+function writeTrendSheetHead(sheet, compressor, slots) {
+  const e = state.equipment;
+  const recorded = slots.filter(Boolean).length;
+  const commLoss = slots.filter((p) => p && p.isConnected === false).length;
+  const percent = state.utilization ? state.utilization.utilizationPercent : null;
+  const day = TREND_EXCEL_WEEKDAYS[new Date(`${state.date}T00:00:00`).getDay()];
+  const session = getSession();
+  const printedBy = (session && session.profile && session.profile.fullName) || (session && session.username) || "";
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  const printedAt = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+
+  const titleRow = sheet.addRow(["트렌드 기록"]);
+  sheet.mergeCells(titleRow.number, 1, titleRow.number, TREND_EXCEL_COLUMNS);
+  applyExcelCell(titleRow.getCell(1), { bold: true, size: 14, align: "left" });
+  titleRow.getCell(1).border = {};
+  titleRow.height = 26;
+
+  const info = [
+    [["지역", e.region], ["시설동", e.buildingName]],
+    [["장비명", equipmentNameWithManagementNo(e.name, e.managementNumber)], ["위치", e.location || "-"]],
+    [["압축기", `COMP #${compressor.sequenceNo}`], ["날짜", `${state.date} (${day})`]],
+    [["기록", `${recorded.toLocaleString()}분 / ${MINUTES_PER_DAY.toLocaleString()}분`], ["통신장애", `${commLoss.toLocaleString()}분`]],
+    [["가동율", percent === null ? "기록 없음" : `${percent}% (장비 기준)`], ["출력", `${printedAt}${printedBy ? ` · ${printedBy}` : ""}`]],
+  ];
+  // 8열을 [라벨 1 | 값 3 | 라벨 1 | 값 3]으로 나눈다
+  info.forEach(([left, right]) => {
+    const row = sheet.addRow([]);
+    [
+      [left, 1],
+      [right, 5],
+    ].forEach(([[label, value], col]) => {
+      const labelCell = row.getCell(col);
+      labelCell.value = label;
+      applyExcelCell(labelCell, { bold: true, fill: TREND_EXCEL_LABEL_FILL, size: 9 });
+      sheet.mergeCells(row.number, col + 1, row.number, col + 3);
+      const valueCell = row.getCell(col + 1);
+      valueCell.value = value ?? "";
+      applyExcelCell(valueCell, { align: "left" });
+    });
+    row.height = 20;
+  });
+  sheet.addRow([]);
 }
 
 document.addEventListener("DOMContentLoaded", initDataQueryPage);

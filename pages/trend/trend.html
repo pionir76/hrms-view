@@ -45,6 +45,8 @@
           </div>
         </div>
         <button type="button" class="btn btn-primary dq-search-btn" id="dqSearchBtn" disabled>조회</button>
+        <!-- 조회한 장비·날짜의 하루 트렌드를 압축기별 시트로 저장한다(조회 전에는 비활성) -->
+        <button type="button" class="btn btn-secondary dq-excel-btn" id="dqExcelBtn" disabled title="조회한 장비·날짜의 트렌드를 압축기별 시트로 저장합니다">엑셀 저장</button>
       </div>
 
       <div class="dq-error" id="dqError" hidden></div>
@@ -127,6 +129,8 @@
   <script src="../../common/js/vendor/chart.umd.min.js"></script>
   <script src="../../common/js/trend-view.js"></script>
   <script src="../../common/js/event-log.js"></script>
+  <script src="../../common/js/vendor/exceljs.min.js"></script>
+  <script src="../../common/js/excel-export.js"></script>
   <script src="trend.js"></script>
   <script>
     requireAuth();

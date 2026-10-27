@@ -91,7 +91,8 @@
   color: var(--color-primary);
 }
 
-.dq-search-btn.btn {
+.dq-search-btn.btn,
+.dq-excel-btn.btn {
   flex-shrink: 0;
   height: 38px;
   padding: 0 26px;
