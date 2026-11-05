@@ -13,6 +13,9 @@
 //
 // 통신이 끊긴 압축기는 값이 마지막 값에서 멈춰 있고 서버가 운전·경보를 false로 주므로(알 수 없음), 운전정보·경보상태는
 // "?"로, 값은 흐리게 보인다. 상태 필터 칩·검색은 운영 상태 보기와 같이 쓴다(dbState.filter / keyword).
+//
+// 경보 중인 값을 누르면 그 채널의 경보 범위(하한~상한)를 보여 주고, 고칠 수 있는 장비면 "설정 화면으로 이동"
+// 링크를 단다(2026-11-05 현장 요청). 링크는 이벤트 상세 창의 "경보 범위 설정"과 같은 주소·권한 기준(event-log.js)이다.
 
 const VALUES_POLL_MS = 3000; // 사용자 결정 2026-10-27
 const VALUES_SETTINGS_REFRESH_MS = 5 * 60 * 1000;
@@ -23,7 +26,7 @@ const valuesState = {
   // 연다 — 스크립트를 읽을 때 정해 둔다(initDashboardMap이 먼저 주소를 다시 쓰면서 view를 지우기 때문)
   view: new URLSearchParams(window.location.search).get("view") === "values" ? "values" : "status",
   equipments: [], // 79번 응답
-  settingsByCompressor: new Map(), // compressorId → { CH01: { dp, unit }, … } (80번)
+  settingsByCompressor: new Map(), // compressorId → { CH01: { dp, unit, name, lower, upper }, … } (80번)
   selectedKey: null, // 강조한 줄 — 압축기 id(압축기 없는 장비는 "e"+장비 id)
   settingsLoadedAt: 0,
   timer: null,
@@ -41,6 +44,7 @@ function initDashboardValues() {
   document.getElementById("dbValues").addEventListener("keydown", (event) => {
     if (event.key === "Enter") toggleValuesRow(event.target.closest("[data-row-key]"));
   });
+  wireAlarmTip();
 
   setListView(valuesState.view);
 }
@@ -103,7 +107,12 @@ async function loadValuesChannelSettings() {
     valuesState.settingsByCompressor = new Map(
       list.map((item) => [
         item.compressorId,
-        Object.fromEntries((item.settings || []).map((s) => [s.channelNo, { dp: s.decimalPlaces, unit: s.unit }])),
+        Object.fromEntries(
+          (item.settings || []).map((s) => [
+            s.channelNo,
+            { dp: s.decimalPlaces, unit: s.unit, name: s.channelName, lower: s.lowerLimit, upper: s.upperLimit },
+          ])
+        ),
       ])
     );
     renderValuesTable(true);
@@ -186,6 +195,7 @@ function renderValuesTable(force) {
   const next = container.querySelector(".dv-scroll");
   next.scrollTop = scrollTop;
   next.scrollLeft = scrollLeft;
+  refreshAlarmTip();
 }
 
 // 장비 한 대 = 압축기 수만큼의 줄. 시설동 칸은 그 시설동 첫 장비의 첫 줄에만(building이 있을 때) 넣는다.
@@ -215,7 +225,8 @@ function valuesEquipmentRowsHtml(e, building) {
         const ch = byNo[meta.no];
         if (!ch || ch.value === null || ch.value === undefined) return `<td class="num"><span>-</span></td>`;
         const { dp, unit } = valueChannelSetting(c.id, meta);
-        return `<td class="num${ch.alarm ? " dv-alarm" : ""}"><span>${formatRawValue(ch.value, dp)}<small class="dv-unit">${escapeHtml(unit)}</small></span></td>`;
+        const tipAttrs = ch.alarm ? ` data-tip-eq="${e.id}" data-tip-comp="${c.id}" data-tip-ch="${meta.no}"` : "";
+        return `<td class="num${ch.alarm ? " dv-alarm" : ""}"${tipAttrs}><span>${formatRawValue(ch.value, dp)}<small class="dv-unit">${escapeHtml(unit)}</small></span></td>`;
       }).join("");
       return `
         <tr ${rowAttrs(c.id)}${i === 0 ? "dv-first" : ""}${comm ? " dv-comm" : ""}">
@@ -229,4 +240,100 @@ function valuesEquipmentRowsHtml(e, building) {
         </tr>`;
     })
     .join("");
+}
+
+// ---------- 경보 범위 말풍선 ----------
+//
+// 표는 3초 갱신 때 다시 그려질 수 있어 말풍선은 표 밖(body)에 하나만 두고, 어느 칸에 붙었는지는 "압축기:채널" 키로 기억한다.
+// 다시 그린 뒤 같은 칸이 아직 경보면 새 칸에 다시 붙이고, 경보가 풀려 칸이 사라졌으면 닫는다(refreshAlarmTip).
+// 경보 칸을 누르면 열고, 같은 칸을 다시 누르거나 바깥을 누르거나 ESC로 닫는다(마우스 오버 → 클릭, 2026-11-05 현장 요청).
+// 칸을 누르면 줄 강조(toggleValuesRow)도 함께 바뀐다 — 어느 압축기의 말풍선인지 보이도록 일부러 그대로 둔다.
+const alarmTip = { el: null, key: null };
+
+function wireAlarmTip() {
+  const container = document.getElementById("dbValues");
+  container.addEventListener("click", (event) => {
+    const cell = event.target.closest("td[data-tip-ch]");
+    if (!cell) return;
+    const key = `${cell.dataset.tipComp}:${cell.dataset.tipCh}`;
+    if (alarmTip.el && !alarmTip.el.hidden && alarmTip.key === key) hideAlarmTip();
+    else showAlarmTip(cell);
+  });
+  document.addEventListener("click", (event) => {
+    if (!event.target.closest("td[data-tip-ch], .dv-tip")) hideAlarmTip();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") hideAlarmTip();
+  });
+  // 말풍선은 화면 기준(fixed) 위치라 표나 화면이 스크롤되면 칸과 어긋난다 — 그냥 닫는다
+  container.addEventListener("scroll", hideAlarmTip, true);
+  window.addEventListener("scroll", hideAlarmTip);
+}
+
+function ensureAlarmTip() {
+  if (alarmTip.el) return alarmTip.el;
+  const el = document.createElement("div");
+  el.className = "dv-tip";
+  el.hidden = true;
+  document.body.appendChild(el);
+  alarmTip.el = el;
+  return el;
+}
+
+function showAlarmTip(cell) {
+  const el = ensureAlarmTip();
+  const { tipEq: equipmentId, tipComp: compressorId, tipCh: channelNo } = cell.dataset;
+  const key = `${compressorId}:${channelNo}`;
+  if (alarmTip.key !== key || el.hidden) {
+    alarmTip.key = key;
+    el.innerHTML = alarmTipHtml(equipmentId, Number(compressorId), channelNo);
+    el.hidden = false;
+    // 설정은 시스템관리자·담당자만 고칠 수 있어, 고칠 수 있는 장비일 때만 링크를 보인다(event-log.js와 같은 기준)
+    fetchManagedEquipmentIds().then((ids) => {
+      if (el.hidden || alarmTip.key !== key) return;
+      el.querySelector(".dv-tip-link").hidden = !ids.has(String(equipmentId));
+    });
+  }
+  placeAlarmTip(cell);
+}
+
+function alarmTipHtml(equipmentId, compressorId, channelNo) {
+  const meta = DISPLAY_CHANNELS.find((m) => m.no === channelNo);
+  const { dp, unit } = valueChannelSetting(compressorId, meta);
+  const s = valuesState.settingsByCompressor.get(compressorId)?.[channelNo];
+  const limit = (raw) => (raw === null || raw === undefined ? "-" : `${formatRawValue(raw, dp)} ${escapeHtml(unit)}`);
+  const params = new URLSearchParams({ equipment: equipmentId, compressor: compressorId, channel: channelNo });
+  const body = s
+    ? `<dl><dt>하한</dt><dd>${limit(s.lower)}</dd><dt>상한</dt><dd>${limit(s.upper)}</dd></dl>`
+    : `<div class="dv-tip-empty">설정값을 불러오지 못했습니다.</div>`;
+  return `
+    <div class="dv-tip-title">${escapeHtml((s && s.name) || meta.label)} 경보 범위</div>
+    ${body}
+    <a class="dv-tip-link" href="../equipment/equipment.html?${params}" target="_blank" rel="noopener" hidden>설정 화면으로 이동 ↗</a>`;
+}
+
+// 칸 아래 오른쪽 끝에 맞춰 띄운다. 화면 아래가 모자라면 칸 위로 올린다
+function placeAlarmTip(cell) {
+  const el = alarmTip.el;
+  const rect = cell.getBoundingClientRect();
+  const margin = 8;
+  let top = rect.bottom + 4;
+  if (top + el.offsetHeight > window.innerHeight - margin) top = rect.top - el.offsetHeight - 4;
+  const left = Math.min(Math.max(margin, rect.right - el.offsetWidth), window.innerWidth - el.offsetWidth - margin);
+  el.style.top = `${Math.max(margin, top)}px`;
+  el.style.left = `${left}px`;
+}
+
+function refreshAlarmTip() {
+  if (!alarmTip.el || alarmTip.el.hidden) return;
+  const [compressorId, channelNo] = alarmTip.key.split(":");
+  const cell = document.querySelector(`#dbValues td[data-tip-comp="${compressorId}"][data-tip-ch="${channelNo}"]`);
+  if (cell) placeAlarmTip(cell);
+  else hideAlarmTip();
+}
+
+function hideAlarmTip() {
+  if (!alarmTip.el) return;
+  alarmTip.el.hidden = true;
+  alarmTip.key = null;
 }

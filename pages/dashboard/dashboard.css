@@ -1289,6 +1289,70 @@ body.page-dashboard {
   font-weight: 800;
 }
 
+/* 경보 값을 누르면 뜨는 경보 범위 말풍선(dashboard-values.js) — 표 밖(body)에 하나만 둔다 */
+
+.dv-tip {
+  position: fixed;
+  z-index: 1000;
+  min-width: 170px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 6px 18px rgba(20, 30, 60, 0.16);
+  font-size: 12.5px;
+}
+
+.dv-tip[hidden] {
+  display: none;
+}
+
+.dv-tip-title {
+  margin-bottom: 6px;
+  font-weight: 800;
+  color: #c4142c;
+}
+
+.dv-tip dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 12px;
+  margin: 0;
+}
+
+.dv-tip dt {
+  color: var(--color-text-muted);
+}
+
+.dv-tip dd {
+  margin: 0;
+  text-align: right;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.dv-tip-empty {
+  color: var(--color-text-muted);
+}
+
+.dv-tip-link {
+  display: block;
+  margin-top: 8px;
+  padding-top: 7px;
+  border-top: 1px solid var(--color-border-soft);
+  font-weight: 700;
+  color: #2f5bea;
+  text-decoration: none;
+}
+
+.dv-tip-link:hover {
+  text-decoration: underline;
+}
+
+.dv-tip-link[hidden] {
+  display: none;
+}
+
 /* 통신 불능 — 값이 마지막 값에서 멈춰 있어 흐리게 */
 .dv-table tr.dv-comm td.num {
   color: #b5bccb;
