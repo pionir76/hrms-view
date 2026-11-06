@@ -12,6 +12,7 @@
 // 사용법:
 //   renderApprovalBar(document.getElementById("approvalBar"), doc, {
 //     allowApprove: doc.id !== null,   // 저장 전 문서는 결재 자체가 불가능
+//     approveBlockedReason: null,      // 결재 차례지만 막힌 경우의 사유 — 버튼을 비활성으로 두고 사유 툴팁을 단다
 //     onApprove: (levelKey) => {...},
 //     onCancel: (levelKey) => {...},
 //   });
@@ -74,7 +75,7 @@ const APPROVAL_EMPTY_DOC = {
 };
 
 function renderApprovalBar(el, doc, options = {}) {
-  const { allowApprove = true, onApprove, onCancel, emptyDoc = APPROVAL_EMPTY_DOC } = options;
+  const { allowApprove = true, approveBlockedReason = null, onApprove, onCancel, emptyDoc = APPROVAL_EMPTY_DOC } = options;
   const session = getSession();
   const target = doc ?? emptyDoc;
 
@@ -103,9 +104,19 @@ function renderApprovalBar(el, doc, options = {}) {
     } else {
       const lowerDone = APPROVAL_LEVEL_KEYS.slice(0, idx).every((k) => isApprovalLevelDone(target[k]));
       const canApprove = allowApprove && lowerDone && session && session.role === roleLabel;
-      inner = canApprove
-        ? `<button type="button" class="btn btn-primary approval-approve-btn" data-level="${key}">결재</button>`
-        : `<span class="approval-pending-text">대기</span>`;
+      if (canApprove && approveBlockedReason) {
+        // 내 차례지만 문서 사정으로 막힘(예: 운전일지 미가동·21시 전) — 버튼은 보이되 비활성, 사유는 툴팁.
+        // 비활성 버튼은 마우스 이벤트를 받지 않으므로 툴팁은 감싼 span이 띄운다.
+        inner = `
+          <span class="approval-blocked" data-tip="${escapeHtml(approveBlockedReason)}" aria-label="${escapeHtml(approveBlockedReason)}">
+            <button type="button" class="btn btn-primary approval-approve-btn" disabled>결재</button>
+          </span>
+        `;
+      } else {
+        inner = canApprove
+          ? `<button type="button" class="btn btn-primary approval-approve-btn" data-level="${key}">결재</button>`
+          : `<span class="approval-pending-text">대기</span>`;
+      }
     }
 
     return `

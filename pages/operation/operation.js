@@ -3,6 +3,13 @@
 const DAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 const TIME_SLOTS = ["time0900", "time1300", "time1600", "time2100"];
 const TIME_SLOT_LABELS = ["09:00", "13:00", "16:00", "21:00"];
+const TIME_SLOT_HOURS = [9, 13, 16, 21];
+// 서버 자동 기록은 정각에 시작해 몇 초 걸린다 — 그 사이에 칸이 열려 사용자가 적은 값이 곧바로 덮어써지지 않게 1분 여유를 둔다
+const SLOT_OPEN_GRACE_MS = 60 * 1000;
+
+// 운전일지 결재를 막는 사유 — 백엔드 OperationLogRules와 같은 문구(api-manual 19번 409 본문)
+const IDLE_BLOCK_MESSAGE = "미가동일은 결재 대상이 아닙니다.";
+const NOT_FINISHED_BLOCK_MESSAGE = "21시 기록이 끝난 뒤에 결재할 수 있습니다.";
 
 // 사업소 공통 서식의 "비고" 문구 (원문 그대로 4개 항목 전부 포함).
 const OPERATION_NOTE_TEXT = [
@@ -13,9 +20,10 @@ const OPERATION_NOTE_TEXT = [
 ].join("<br />");
 
 // 레포트 형식(항목 목록·구분·순서)은 백엔드가 관리하지 않는 프론트 책임 영역이다
-// (README 10장 "운전일지 양식" 참고). 자동으로 채워지는 10개 항목의 itemKey만은
-// 백엔드와 정확히 일치해야 한다 — 채널 자동측정 5개(channelNo 있음, AutoMeasuredItemCatalog)와
-// 장비설정 기반 랜덤값 5개(channelNo 없음, EquipmentRangeItemCatalog). 후자는 2026-09-11
+// (README 10장 "운전일지 양식" 참고). 다만 16개 항목의 itemKey는 서버 자동 기록이 알고 있으므로
+// 백엔드와 정확히 일치해야 한다 — 채널 자동측정 5개(channelNo 있음, AutoMeasuredItemCatalog),
+// 장비설정 기반 랜덤값 5개(channelNo 없음, EquipmentRangeItemCatalog), 체크 항목 6개(kind "ox",
+// CheckItemCatalog — 2026-11-06부터 서버가 직전 값 복사·정지 시 "/"/"O"로 자동 기록). 랜덤값은 2026-09-11
 // 사양 변경으로 신규 추가됐다 — 냉각수온도(입구/출구)는 더 이상 CH01을 읽지 않고, 브라인온도
 // (입구/출구)·운전전압과 함께 채널 없이 장비 설정(Has*/Min/Max) 기반 랜덤값으로 바뀌었다.
 // 백엔드가 이미 소수점 1자리 문자열("12.3" 등)로 내려주므로 raw→실값 변환이 필요 없다
@@ -98,6 +106,8 @@ const modalState = {
   buildingName: "",
   date: null, // 'yyyy-MM-dd'
   id: null,
+  isIdle: false, // 미가동 일지 — 결재 대상이 아니다(api-manual 16번, 2026-11-06)
+  pendingSlots: [], // 문서를 그린 시점에 아직 오지 않은 기록 시각(입력을 막은 칸) — 저장 때 그 사이 지난 칸은 서버 값으로 맞춘다
   level1: null,
   level2: null,
   level3: null,
@@ -114,19 +124,27 @@ const channelSettingsByCompressor = new Map();
 async function initOperationPage() {
   populateYearMonthSelects();
 
+  let myEquipments;
   try {
     // 담당 장비만 — 저장 권한이 담당 기준이라 목록도 같은 기준으로 맞춘다(백엔드 2026-09-28).
     // 시스템관리자는 mine=true여도 서버가 전체를 준다.
-    state.equipments = await apiFetch("/api/equipments?mine=true");
+    myEquipments = await apiFetch("/api/equipments?mine=true");
   } catch (err) {
     document.getElementById("calendarArea").innerHTML =
       `<div class="empty-state">장비 목록을 불러오지 못했습니다. (${escapeHtml(err.message)})</div>`;
     return;
   }
+  // 운전일지는 장비 상태가 '운영'인 장비에만 생긴다(api-manual 16번, 2026-11-06) — 나머지 장비는
+  // 매일 빈 폼만 나와서 선택 목록에서 뺀다(사용자 결정 2026-11-06).
+  state.equipments = myEquipments.filter((e) => e.status === "운영");
 
-  // 담당 장비가 하나도 없으면 선택 자체가 불가능하다 — 화면이 고장 난 것으로 오해하지 않게 알려준다
+  // 고를 장비가 하나도 없으면 선택 자체가 불가능하다 — 화면이 고장 난 것으로 오해하지 않게 알려준다
   if (state.equipments.length === 0) {
-    renderCalendarPlaceholder("담당 장비가 없습니다. 시스템관리자에게 담당 장비 등록을 요청하세요.");
+    renderCalendarPlaceholder(
+      myEquipments.length === 0
+        ? "담당 장비가 없습니다. 시스템관리자에게 담당 장비 등록을 요청하세요."
+        : "운영 중인 담당 장비가 없습니다. 운전일지는 장비 상태가 '운영'인 장비만 작성합니다."
+    );
   }
 
   populateRegionSelect();
@@ -394,11 +412,27 @@ function isAnyApproved() {
   return isApprovalStarted(modalState);
 }
 
-// 결재가 하나라도 진행되면 읽기 전용 — 점검일지와 같은 규칙으로 맞춘다(사용자 결정 2026-09-28).
-// 백엔드는 운전일지 저장을 막지 않으므로(api-manual 18번) 잠그는 책임이 프론트에 있다.
-// 결재된 문서의 값이 나중에 조용히 바뀌면 법정 일지로서 신뢰할 수 없게 된다.
+// 결재가 하나라도 진행되면 읽기 전용 — 점검일지와 같은 규칙(사용자 결정 2026-09-28).
+// 2026-11-06부터 백엔드도 이 경우 저장을 409로 막는다(api-manual 18번). 미가동 전환(20-1번)만 예외.
 function isDocLocked() {
   return isApprovalStarted(modalState);
+}
+
+// ---------- 기록 시각 판정 (브라우저 = 한국 시간 기준) ----------
+
+// 그 날짜의 기록 시각 칸이 아직 오지 않았는지. 오지 않은 칸은 그 시각에 서버가 전 항목을 덮어쓰므로
+// 입력을 막는다(사용자 결정 2026-11-06). 놓친 시각(서버가 꺼져 있던 칸)은 지난 칸이라 직접 적을 수 있다.
+function isSlotPending(dateStr, slot) {
+  const hour = TIME_SLOT_HOURS[TIME_SLOTS.indexOf(slot)];
+  const slotTime = new Date(`${dateStr}T${String(hour).padStart(2, "0")}:00:00`);
+  return Date.now() < slotTime.getTime() + SLOT_OPEN_GRACE_MS;
+}
+
+// 결재 차례인 사람에게 버튼을 비활성으로 보여줄 사유(툴팁). 막지 않으면 null. 서버도 같은 기준으로 409를 낸다.
+function operationApproveBlockReason() {
+  if (modalState.isIdle) return IDLE_BLOCK_MESSAGE;
+  if (isSlotPending(modalState.date, "time2100")) return NOT_FINISHED_BLOCK_MESSAGE;
+  return null;
 }
 
 // 저장 안 한 채 닫거나 결재하면 입력이 사라지므로, 연 시점 값을 기준으로 잡아 비교한다
@@ -411,8 +445,12 @@ function isFullyApproved() {
   return isApprovalComplete(modalState);
 }
 
-// 미상신 / 책임자 대기 / 총괄자 대기 / 완료 — level1이 아직이면 저장 여부와 무관하게 "미상신"으로 합친다.
+// 미가동 / 미상신 / 책임자 대기 / 총괄자 대기 / 완료 — level1이 아직이면 저장 여부와 무관하게 "미상신"으로 합친다.
+// 미가동은 결재 단계와 상관없이 가장 먼저 본다 — 결재가 끝난 뒤 미가동으로 바꾼 날도 미가동으로 보인다.
 function deriveDayStatus(log) {
+  if (log && log.isIdle) {
+    return { label: "미가동", badgeClass: "badge-idle" };
+  }
   if (!log || log.id === null || !isApprovalLevelDone(log.level1)) {
     return { label: "미상신", badgeClass: "badge-muted" };
   }
@@ -460,10 +498,11 @@ function renderCalendarTable(weeks, logsByDate, month) {
           }
           const dateStr = toDateStr(d);
           const status = deriveDayStatus(logsByDate.get(dateStr));
-          const cls = dow === 0 ? "cal-sun" : dow === 6 ? "cal-sat" : "";
+          const isToday = dateStr === todayDateString();
+          const cls = [dow === 0 ? "cal-sun" : dow === 6 ? "cal-sat" : "", isToday ? "cal-today" : ""].filter(Boolean).join(" ");
           return `
             <td class="${cls}">
-              <div class="cal-date">${d.getDate()}</div>
+              <div class="cal-date">${isToday ? `<span class="cal-today-num">${d.getDate()}</span><span class="cal-today-tag">오늘</span>` : d.getDate()}</div>
               <button type="button" class="cal-status-btn badge ${status.badgeClass}" data-date="${dateStr}">${status.label}</button>
             </td>
           `;
@@ -572,6 +611,7 @@ function closeOperationModal() {
 
 function applyLogResponse(log) {
   modalState.id = log.id;
+  modalState.isIdle = !!log.isIdle;
   modalState.level1 = log.level1;
   modalState.level2 = log.level2;
   modalState.level3 = log.level3;
@@ -584,6 +624,7 @@ function renderModalBody() {
   const fullyApproved = isFullyApproved();
   const locked = isDocLocked();
   const dateObj = new Date(modalState.date);
+  modalState.pendingSlots = TIME_SLOTS.filter((slot) => isSlotPending(modalState.date, slot));
 
   const html = `
     <div class="op-report-header">
@@ -593,11 +634,13 @@ function renderModalBody() {
         <span class="op-meta-chip op-meta-chip-primary">${escapeHtml(modalState.equipmentName)}${managementNoHtml(modalState.managementNumber)}</span>
       </div>
       <div class="op-report-right">
+        ${renderIdleSwitchHtml()}
         <span class="doc-operating-status">운영 상태 : ${escapeHtml(modalState.operatingStatus || "-")}</span>
         <span class="op-report-date-badge">${formatDateKo(modalState.date)} (${DAY_LABELS[dateObj.getDay()]})</span>
       </div>
     </div>
 
+    ${modalState.isIdle ? `<div class="op-idle-note">미가동일로 지정된 일지입니다. 미가동일은 결재 대상이 아닙니다.</div>` : ""}
     ${locked ? `<div class="op-approved-note">${fullyApproved ? "결재가 완료된" : "결재가 진행된"} 문서라 읽기 전용입니다. 다시 수정하려면 시스템관리자의 결재 리셋이 필요합니다.</div>` : ""}
     <div class="op-error" id="opError" hidden></div>
 
@@ -619,7 +662,11 @@ function renderModalBody() {
             <th>사용장비</th>
             <th colspan="2">점검항목</th>
             <th>실측 기준</th>
-            ${TIME_SLOT_LABELS.map((l) => `<th>${l}</th>`).join("")}
+            ${TIME_SLOTS.map((slot, i) =>
+              modalState.pendingSlots.includes(slot)
+                ? `<th class="op-th-pending" title="${TIME_SLOT_LABELS[i]}이 되면 서버가 자동으로 기록합니다">${TIME_SLOT_LABELS[i]}<span class="op-th-pending-tag">기록 전</span></th>`
+                : `<th>${TIME_SLOT_LABELS[i]}</th>`
+            ).join("")}
           </tr>
         </thead>
         <tbody id="reportTableBody"></tbody>
@@ -654,6 +701,9 @@ function renderModalBody() {
   if (saveBtn) saveBtn.addEventListener("click", () => saveOperationLog());
   const resetBtn = document.getElementById("resetApprovalBtn");
   if (resetBtn) resetBtn.addEventListener("click", resetApprovals);
+  document.querySelectorAll(".op-idle-opt").forEach((btn) => {
+    btn.addEventListener("click", () => setOperationIdle(btn.dataset.idle === "true"));
+  });
 }
 
 function showOpError(err) {
@@ -661,9 +711,49 @@ function showOpError(err) {
   if (!el) return;
   let message = err.message;
   if (err.status === 403) message = "권한이 없습니다. (역할 또는 담당 장비 등록 여부를 확인하세요.)";
-  if (err.status === 409) message = "처리할 수 없습니다. 결재 순서를 다시 확인하세요.";
+  // 409는 서버 문구(미가동·21시 전·결재 진행 중 저장 등)를 그대로 보여준다 — 본문이 비었을 때만 일반 안내
+  if (err.status === 409 && !parseErrorBody(err.bodyText)) message = "처리할 수 없습니다. 결재 순서를 다시 확인하세요.";
   el.textContent = message;
   el.hidden = false;
+}
+
+// ---------- 가동 / 미가동 전환 (api-manual 20-1번) ----------
+
+// 문서 머리 우측의 [가동 | 미가동] 전환 버튼. 결재가 진행·완료된 문서나 지난 날짜에도 바꿀 수 있다(사양).
+// 로그가 없는 날짜(id 없음 — 서버가 하루 종일 꺼져 있던 날)는 서버가 받지 않으므로 비활성.
+function renderIdleSwitchHtml() {
+  const noLog = modalState.id === null;
+  const idle = modalState.isIdle;
+  const title = noLog ? "기록이 없는 날짜는 바꿀 수 없습니다" : "누르면 바로 저장됩니다";
+  return `
+    <div class="op-idle-switch${idle ? " is-idle" : ""}" role="group" aria-label="가동 상태" title="${title}">
+      <button type="button" class="op-idle-opt${idle ? "" : " active"}" data-idle="false" aria-pressed="${!idle}"${noLog ? " disabled" : ""}>가동</button>
+      <button type="button" class="op-idle-opt${idle ? " active" : ""}" data-idle="true" aria-pressed="${idle}"${noLog ? " disabled" : ""}>미가동</button>
+    </div>
+  `;
+}
+
+// 미가동 전환은 저장 버튼과 별개로 바로 저장된다. 응답으로 표 값까지 덮어쓰면 저장 안 한 입력이
+// 사라지므로, 미가동 여부와 결재 상태만 받아와 다시 그린다(입력 중인 값과 변경 여부는 그대로 유지).
+async function setOperationIdle(isIdle) {
+  if (modalState.id === null || modalState.isIdle === isIdle) return;
+  if (isIdle && !window.confirm("미가동 전환 하시겠습니까?\n미가동 상태에서는 결재가 불가능합니다.")) return;
+  document.querySelectorAll(".op-idle-opt").forEach((btn) => (btn.disabled = true));
+  try {
+    const updated = await apiFetch(`/api/operation-logs/${modalState.id}/idle`, {
+      method: "PUT",
+      body: JSON.stringify({ isIdle }),
+    });
+    modalState.isIdle = !!updated.isIdle;
+    modalState.level1 = updated.level1;
+    modalState.level2 = updated.level2;
+    modalState.level3 = updated.level3;
+    renderModalBody();
+    loadCalendar();
+  } catch (err) {
+    document.querySelectorAll(".op-idle-opt").forEach((btn) => (btn.disabled = false));
+    showOpError(err);
+  }
 }
 
 // ---------- 결재 바 (그리기는 common/js/approval.js, API 호출만 여기서) ----------
@@ -671,6 +761,7 @@ function showOpError(err) {
 function renderOperationApprovalBar() {
   renderApprovalBar(document.getElementById("approvalBar"), modalState, {
     allowApprove: modalState.id !== null, // 저장 전 문서는 결재할 수 없다
+    approveBlockedReason: operationApproveBlockReason(), // 미가동·21시 전이면 버튼 비활성 + 사유 툴팁
     onApprove: approveLevel,
     onCancel: cancelApproval,
   });
@@ -866,11 +957,16 @@ function renderReportTable(rows) {
 }
 
 function renderValueCell(row, slot) {
+  // 아직 오지 않은 기록 시각은 서버가 그 시각에 덮어쓰므로 입력을 막는다(사용자 결정 2026-11-06)
+  const pending = modalState.pendingSlots.includes(slot);
+  const disabled = isDocLocked() || pending;
+  const cellClass = pending ? ` class="op-cell-pending"` : "";
+
   if (row.kind === "toggle") {
     const value = getItemSlotRaw(row.itemKey, row.compressorId, slot);
     return `
-      <td>
-        <button type="button" class="ox-toggle-btn ${oxCellClass(value)}" data-item-key="${escapeAttr(row.itemKey)}" data-slot="${slot}"${isDocLocked() ? " disabled" : ""}>${oxToggleSymbol(value)}</button>
+      <td${cellClass}>
+        <button type="button" class="ox-toggle-btn ${oxCellClass(value)}" data-item-key="${escapeAttr(row.itemKey)}" data-slot="${slot}"${disabled ? " disabled" : ""}>${oxToggleSymbol(value)}</button>
       </td>
     `;
   }
@@ -881,7 +977,7 @@ function renderValueCell(row, slot) {
   const autoClass = row.auto ? "op-cell-auto" : "";
 
   return `
-    <td>
+    <td${cellClass}>
       <input
         type="text"
         class="op-value-input ${autoClass}"
@@ -890,7 +986,7 @@ function renderValueCell(row, slot) {
         data-slot="${slot}"
         data-dp="${dp === null || dp === undefined ? "" : dp}"
         value="${escapeAttr(display)}"
-        ${isDocLocked() ? "disabled" : ""}
+        ${disabled ? "disabled" : ""}
       />
     </td>
   `;
@@ -1035,21 +1131,43 @@ function escapeAttr(value) {
 
 // ---------- 저장 ----------
 
+// 저장은 문서 전체 교체다(18번). 창을 열어 둔 사이 기록 시각이 지나 서버가 그 칸을 적었다면, 화면에 남은
+// 옛 값(대개 빈 칸)으로 보내면 서버 기록이 지워진다. 그래서 그린 시점엔 막혀 있었는데 지금은 지난 칸만
+// 최신 서버 값으로 바꿔 보낸다 — 막혀 있던 칸이라 사용자가 고친 값은 없다.
+async function mergeSlotsRecordedMeanwhile(items) {
+  const passed = modalState.pendingSlots.filter((slot) => !isSlotPending(modalState.date, slot));
+  if (passed.length === 0) return;
+
+  const latest = await apiFetch(`/api/operation-logs?equipmentId=${modalState.equipmentId}&date=${modalState.date}`);
+  latest.items.forEach((server) => {
+    const compressorId = server.compressorId ?? null;
+    let local = items.find((it) => it.itemKey === server.itemKey && it.compressorId === compressorId);
+    if (!local) {
+      local = { itemKey: server.itemKey, compressorId, time0900: null, time1300: null, time1600: null, time2100: null };
+      items.push(local);
+    }
+    passed.forEach((slot) => {
+      local[slot] = server[slot] ?? null;
+    });
+  });
+}
+
 // 결재 전 자동 저장에서도 부르므로 성공하면 true를 돌려준다(approval.js confirmBeforeApprove).
 async function saveOperationLog({ askConfirm = true, closeAfter = true } = {}) {
   if (askConfirm && !window.confirm("저장하시겠습니까?")) return false;
 
+  const items = modalState.items.map((it) => ({
+    itemKey: it.itemKey,
+    compressorId: it.compressorId ?? null,
+    time0900: it.time0900 ?? null,
+    time1300: it.time1300 ?? null,
+    time1600: it.time1600 ?? null,
+    time2100: it.time2100 ?? null,
+  }));
   const payload = {
     equipmentId: Number(modalState.equipmentId),
     date: modalState.date,
-    items: modalState.items.map((it) => ({
-      itemKey: it.itemKey,
-      compressorId: it.compressorId ?? null,
-      time0900: it.time0900 ?? null,
-      time1300: it.time1300 ?? null,
-      time1600: it.time1600 ?? null,
-      time2100: it.time2100 ?? null,
-    })),
+    items,
     references: modalState.references.map((r) => ({
       itemKey: r.itemKey,
       referenceText: r.referenceText ?? null,
@@ -1057,6 +1175,7 @@ async function saveOperationLog({ askConfirm = true, closeAfter = true } = {}) {
   };
 
   try {
+    await mergeSlotsRecordedMeanwhile(items);
     await apiFetch("/api/operation-logs", {
       method: "PUT",
       body: JSON.stringify(payload),

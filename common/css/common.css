@@ -1698,6 +1698,49 @@ select::-ms-expand {
   color: var(--color-text-muted);
 }
 
+/* 결재 차례지만 막힌 버튼(approval.js approveBlockedReason) — 마우스를 올리면 버튼 위에 사유 말풍선.
+   칸(.approval-slot)이 overflow: hidden이라 말풍선은 칸 안(머리글 위)에 뜨도록 위로만 띄운다. */
+.approval-blocked {
+  position: relative;
+  display: inline-flex;
+  cursor: not-allowed;
+}
+
+.approval-blocked .btn:disabled {
+  pointer-events: none;
+}
+
+.approval-blocked::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translate(-50%, 4px);
+  /* 결재 칸이 좁은 화면(운전일지 등 우측 절반 배치)에서도 칸 밖으로 잘리지 않게 줄바꿈한다 */
+  width: max-content;
+  max-width: 150px;
+  white-space: normal;
+  word-break: keep-all;
+  text-align: center;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  background: #1f2a3d;
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1.4;
+  box-shadow: var(--shadow-pop);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease, transform 0.12s ease;
+  z-index: 2;
+}
+
+.approval-blocked:hover::after {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
 /* "해당없음" 단계는 글자 "/" 대신 칸 전체를 가로지르는 대각선으로 표시한다(실물 결재란 방식).
    SVG를 배경으로 깔아 칸 크기가 어떻든 우측 상단 ↔ 좌측 하단 모서리를 정확히 잇게 한다
    (linear-gradient로 그리면 칸이 정사각형이 아닐 때 모서리에 닿지 않는다).

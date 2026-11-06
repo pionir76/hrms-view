@@ -95,6 +95,39 @@
   color: var(--color-primary);
 }
 
+/* 오늘 — 칸 바탕을 옅은 파랑으로, 날짜는 채운 원 + "오늘" 글자 */
+.operation-calendar td.cal-today {
+  background: var(--color-primary-soft);
+  box-shadow: inset 0 0 0 2px rgba(47, 91, 234, 0.35);
+}
+
+.cal-today .cal-date {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  margin-bottom: 4px;
+}
+
+.cal-today-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--color-primary);
+  color: #fff;
+  font-weight: 700;
+}
+
+.cal-today-tag {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
 .cal-empty {
   background: #fafbfc;
 }
@@ -107,6 +140,14 @@
 
 .cal-status-btn:hover {
   filter: brightness(0.96);
+}
+
+/* 미가동일 — 결재 대상이 아닌 날. 다른 상태(초록·주황·회색)와 겹치지 않는 보라 계열로 눈에 띄게(사용자 결정 2026-11-06) */
+.badge-idle {
+  background: #efeafd;
+  color: #5b45c4;
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1px #c9bdf5;
 }
 
 /* ---------- 모달 공통 ---------- */
@@ -200,6 +241,69 @@
   padding: 9px 12px;
   font-size: 12.5px;
   margin-bottom: 14px;
+}
+
+/* 미가동일 안내 — 캘린더 미가동 배지와 같은 보라 계열 */
+.op-idle-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f5f2fe;
+  color: #4b3aa8;
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  font-size: 12.5px;
+  margin-bottom: 14px;
+}
+
+.op-idle-note::before {
+  content: "";
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #7c66e0;
+}
+
+/* 문서 머리 우측 [가동 | 미가동] 전환 — 누르면 바로 저장(20-1번) */
+.op-idle-switch {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 999px;
+  background: #f2f4f7;
+  box-shadow: inset 0 0 0 1px var(--color-border);
+}
+
+.op-idle-opt {
+  border: none;
+  background: transparent;
+  border-radius: 999px;
+  padding: 4px 13px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.op-idle-opt:hover:not(:disabled):not(.active) {
+  color: var(--color-text);
+}
+
+.op-idle-opt.active {
+  background: var(--color-surface);
+  color: #0f9467;
+  box-shadow: var(--shadow-pop);
+  cursor: default;
+}
+
+.op-idle-switch.is-idle .op-idle-opt.active {
+  color: #5b45c4;
+}
+
+.op-idle-opt:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .op-error {
@@ -310,6 +414,36 @@
 .op-value-input.op-cell-auto {
   background: #f5f8ff;
   border-color: #c9d9f7;
+}
+
+/* 아직 오지 않은 기록 시각 — 그 시각에 서버가 적으므로 입력을 막고 칸 전체를 옅게 */
+.op-th-pending {
+  color: var(--color-text-faint);
+}
+
+.op-th-pending-tag {
+  display: block;
+  margin-top: 2px;
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--color-text-faint);
+}
+
+.op-cell-pending {
+  background: #fafbfc;
+}
+
+.op-cell-pending .op-value-input,
+.op-cell-pending .op-value-input.op-cell-auto {
+  background: transparent;
+  border-color: var(--color-border-soft);
+  border-style: dashed;
+  cursor: not-allowed;
+}
+
+.op-cell-pending .ox-toggle-btn {
+  border-style: dashed;
+  background: transparent;
 }
 
 /* O/X 토글 버튼 스타일(.ox-toggle-btn)은 common.css에 있다 */
