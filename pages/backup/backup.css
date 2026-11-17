@@ -1,0 +1,93 @@
+/* 백업 관리 페이지 */
+
+.bk-panel {
+  padding: 20px 22px;
+}
+
+.bk-form {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(120px, 160px)) minmax(240px, 1fr);
+  gap: 14px 18px;
+  align-items: end;
+  margin-top: 14px;
+}
+
+/* .field가 display:flex라 hidden 속성이 먹지 않는다 — 요일 칸(매주일 때만) */
+.bk-form .field[hidden] {
+  display: none;
+}
+
+/* 저장 위치는 경로가 길어 넓게 — 맨 끝 칸 */
+.bk-field-wide {
+  grid-column: 6;
+  grid-row: 1;
+}
+
+.bk-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  font-size: 13px;
+  color: var(--color-text);
+}
+
+input[type="time"] {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  font-family: inherit;
+  font-size: 13px;
+  background-color: var(--color-surface);
+}
+
+.bk-warning {
+  margin: 10px 0 0;
+  font-size: 12.5px;
+  color: #b54708;
+}
+
+.bk-form-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border-soft);
+}
+
+.bk-summary {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.bk-summary b {
+  color: var(--color-text);
+}
+
+.bk-note {
+  margin: 8px 0 12px;
+  font-size: 12.5px;
+  color: var(--color-text-muted);
+}
+
+.bk-table td {
+  white-space: nowrap;
+}
+
+.bk-table td.bk-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.bk-table td.bk-detail {
+  white-space: normal;
+  word-break: break-all;
+  font-size: 12.5px;
+}
+
+.bk-table td.bk-detail small {
+  display: block;
+  color: var(--color-text-muted);
+}

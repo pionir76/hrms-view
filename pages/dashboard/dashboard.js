@@ -435,10 +435,11 @@ async function loadSystemStatus() {
   // 서버 상태
   document.getElementById("srvServer").innerHTML = healthBadge(s.server && s.server.status);
 
-  // DB 백업 — 백업 기능이 아직 없어 현재 항상 null(백엔드 README "DB 백업")
+  // DB 백업 — 마지막으로 끝난 백업과 예약 문구(백업 관리 화면에서 설정, 2026-11-17). 백업 설정이 없거나
+  // DB에 접속하지 못하면 null
   const backup = s.databaseBackup;
   document.getElementById("srvBackup").innerHTML = !backup
-    ? `<span class="db-health none">미설정</span><small>백업 기능 준비 중</small>`
+    ? `<span class="db-health none">미설정</span><small>백업 정보 없음</small>`
     : `${backup.lastBackupAt ? escapeHtml(formatDateTimeSeconds(backup.lastBackupAt).slice(0, 16)) : "기록 없음"}${
         backup.lastBackupSucceeded ? "" : ` ${healthBadge("오류")}`
       }<small>${escapeHtml(backup.scheduleText || "일정 없음")}</small>`;

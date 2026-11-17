@@ -22,6 +22,8 @@ const MENU = [
   { id: "training", label: "교육훈련", href: "../training/training.html" },
   { id: "inspection", label: "점검일지", href: "../inspection/inspection.html" },
   { id: "operation", label: "운전일지", href: "../operation/operation.html" },
+  // 시스템관리자에게만 보이는 메뉴(2026-11-17) — 서버 API도 시스템관리자만 허용한다
+  { id: "backup", label: "백업 관리", href: "../backup/backup.html", adminOnly: true },
 ];
 
 // 담당업무별 배지 색(조직 관리 화면과 같은 계열)
@@ -64,9 +66,10 @@ function formatTopbarDateTime(date) {
 const TB_ICON_APPROVAL = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>`;
 
 function buildTopbarHtml(session, activePage) {
-  const menuHtml = MENU.map(
-    (item) => `<a class="menu-item${item.id === activePage ? " active" : ""}" href="${item.href}">${item.label}</a>`
-  ).join("");
+  const isAdmin = session?.role === "시스템관리자";
+  const menuHtml = MENU.filter((item) => !item.adminOnly || isAdmin)
+    .map((item) => `<a class="menu-item${item.id === activePage ? " active" : ""}" href="${item.href}">${item.label}</a>`)
+    .join("");
 
   return `
     <a class="topbar-brand" href="../dashboard/dashboard.html" aria-label="냉동기 중앙통제시스템 — 실시간 현황으로">

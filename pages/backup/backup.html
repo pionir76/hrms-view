@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>백업 관리 - HRMS</title>
+  <link rel="stylesheet" href="../../common/css/common.css" />
+  <link rel="stylesheet" href="backup.css" />
+</head>
+<body data-page="backup">
+  <div class="app-shell">
+    <header class="topbar" id="topbar"></header>
+    <main class="content content-narrow" id="content">
+      <div class="page-header page-header-row">
+        <div>
+          <h1>백업 관리</h1>
+          <p>정해 둔 주기·시각에 DB·첨부파일·설정을 서버 디스크에 자동으로 백업합니다. 시스템관리자 전용입니다.</p>
+        </div>
+        <button type="button" class="btn btn-primary" id="bkRunBtn" hidden>지금 백업</button>
+      </div>
+
+      <div class="empty-state" id="bkDenied" hidden>시스템관리자만 사용할 수 있는 화면입니다.</div>
+
+      <div id="bkBody" hidden>
+        <section class="panel bk-panel">
+          <h2 class="section-title">백업 설정</h2>
+          <div class="bk-form">
+            <div class="field">
+              <label for="bkEnabled">자동 백업</label>
+              <label class="bk-check"><input type="checkbox" id="bkEnabled" /> 사용</label>
+            </div>
+            <div class="field">
+              <label for="bkFrequency">주기</label>
+              <select id="bkFrequency">
+                <option value="매일">매일</option>
+                <option value="매주">매주</option>
+              </select>
+            </div>
+            <div class="field" id="bkWeeklyDayField" hidden>
+              <label for="bkWeeklyDay">요일</label>
+              <select id="bkWeeklyDay">
+                <option value="0">일요일</option>
+                <option value="1">월요일</option>
+                <option value="2">화요일</option>
+                <option value="3">수요일</option>
+                <option value="4">목요일</option>
+                <option value="5">금요일</option>
+                <option value="6">토요일</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="bkRunTime">실행 시각</label>
+              <input type="time" id="bkRunTime" />
+            </div>
+            <div class="field bk-field-wide">
+              <label for="bkDirectory">저장 위치</label>
+              <input type="text" id="bkDirectory" placeholder="D:\HRMS_backup" />
+            </div>
+            <div class="field">
+              <label for="bkKeepCount">보관 개수</label>
+              <input type="number" id="bkKeepCount" min="1" max="365" />
+            </div>
+          </div>
+          <p class="bk-warning" id="bkTimeWarning" hidden></p>
+          <div class="bk-form-footer">
+            <div class="bk-summary" id="bkSummary"></div>
+            <button type="button" class="btn btn-primary" id="bkSaveBtn">저장</button>
+          </div>
+        </section>
+
+        <section class="panel bk-panel">
+          <h2 class="section-title">백업 이력</h2>
+          <p class="bk-note">복구는 서버에서 <code>Infrastructure\Setup\restore.ps1</code>로 합니다(설치 가이드 13장). 복구하는 동안 서비스가 잠시 멈춥니다.</p>
+          <div class="table-scroll">
+            <table class="data-table bk-table">
+              <thead>
+                <tr>
+                  <th>시작</th>
+                  <th>종류</th>
+                  <th>결과</th>
+                  <th>크기</th>
+                  <th>백업 폴더 / 사유</th>
+                </tr>
+              </thead>
+              <tbody id="bkHistoryBody">
+                <tr><td colspan="5"><div class="empty-state">불러오는 중...</div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script src="../../common/js/config.js"></script>
+  <script src="../../common/js/auth.js"></script>
+  <script src="../../common/js/api.js"></script>
+  <script src="../../common/js/ui.js"></script>
+  <script src="../../common/js/approval-inbox.js"></script>
+  <script src="../../common/js/layout.js"></script>
+  <script src="backup.js"></script>
+  <script>
+    requireAuth();
+    renderLayout();
+  </script>
+</body>
+</html>
