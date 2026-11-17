@@ -374,10 +374,12 @@ function renderCalendarTable(weeks, logs, month) {
           if (d.getMonth() + 1 !== month) {
             return `<td class="cal-empty"></td>`;
           }
-          const cls = dow === 0 ? "cal-sun" : dow === 6 ? "cal-sat" : "";
+          // 오늘 칸은 운전일지 캘린더와 같은 모양으로 표시한다(2026-11-17 현장 요청)
+          const isToday = toDateStr(d) === todayDateString();
+          const cls = [dow === 0 ? "cal-sun" : dow === 6 ? "cal-sat" : "", isToday ? "cal-today" : ""].filter(Boolean).join(" ");
           return `
             <td class="${cls}">
-              <div class="cal-date">${d.getDate()}</div>
+              <div class="cal-date">${isToday ? `<span class="cal-today-num">${d.getDate()}</span><span class="cal-today-tag">오늘</span>` : d.getDate()}</div>
               <button type="button" class="cal-write-btn" data-week-start="${weekStart}">작성</button>
             </td>
           `;
