@@ -16,6 +16,9 @@
 //
 // 경보 중인 값을 누르면 그 채널의 경보 범위(하한~상한)를 보여 주고, 고칠 수 있는 장비면 "설정 화면으로 이동"
 // 링크를 단다(2026-11-05 현장 요청). 링크는 이벤트 상세 창의 "경보 범위 설정"과 같은 주소·권한 기준(event-log.js)이다.
+//
+// IP 주소를 누르면 그 TLC의 웹 화면(http://IP/, SAMWONTECH)을 새 탭으로 연다(2026-11-17 현장 요청). 사용자 PC의
+// 브라우저가 TLC에 직접 접속하는 방식이다. IP를 눌렀을 때는 줄 강조를 바꾸지 않는다.
 
 const VALUES_POLL_MS = 3000; // 사용자 결정 2026-10-27
 const VALUES_SETTINGS_REFRESH_MS = 5 * 60 * 1000;
@@ -40,9 +43,12 @@ function initDashboardValues() {
     const btn = event.target.closest("[data-view]");
     if (btn) setListView(btn.dataset.view);
   });
-  document.getElementById("dbValues").addEventListener("click", (event) => toggleValuesRow(event.target.closest("[data-row-key]")));
+  document.getElementById("dbValues").addEventListener("click", (event) => {
+    if (event.target.closest(".dv-ip-link")) return; // TLC 웹 화면 링크 — 줄 강조는 그대로 둔다
+    toggleValuesRow(event.target.closest("[data-row-key]"));
+  });
   document.getElementById("dbValues").addEventListener("keydown", (event) => {
-    if (event.key === "Enter") toggleValuesRow(event.target.closest("[data-row-key]"));
+    if (event.key === "Enter" && !event.target.closest(".dv-ip-link")) toggleValuesRow(event.target.closest("[data-row-key]"));
   });
   wireAlarmTip();
 
@@ -235,11 +241,18 @@ function valuesEquipmentRowsHtml(e, building) {
           <td class="c">${runTag}</td>
           <td class="c">${alarmTag}</td>
           ${values}
-          <td class="ip">${escapeHtml(c.ipAddress || "-")}</td>
+          <td class="ip">${tlcLinkHtml(c.ipAddress)}</td>
           <td class="c"><span class="dv-tag ${comm ? "fail" : "ok"}" title="${escapeHtml(c.communicationStatus)}">${comm ? "불능" : "정상"}</span></td>
         </tr>`;
     })
     .join("");
+}
+
+// TLC 웹 화면 링크. 평소엔 다른 칸처럼 회색 글자로 보이고, 마우스를 올리면 링크 모양이 된다(dashboard.css .dv-ip-link)
+function tlcLinkHtml(ip) {
+  if (!ip) return "-";
+  const safe = escapeHtml(ip);
+  return `<a class="dv-ip-link" href="http://${safe}/" target="_blank" rel="noopener" title="TLC 웹 화면 열기(새 탭)">${safe}<span class="dv-ip-ext" aria-hidden="true">↗</span></a>`;
 }
 
 // ---------- 경보 범위 말풍선 ----------

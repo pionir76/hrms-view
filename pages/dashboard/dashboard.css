@@ -1159,6 +1159,29 @@ body.page-dashboard {
   color: var(--color-text-sub);
 }
 
+/* IP → TLC 웹 화면(새 탭). 평소엔 그냥 글자처럼, 마우스를 올리면 링크 모양 + ↗ (↗ 자리는 미리 잡아 둬 글자가 밀리지 않게) */
+.dv-ip-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.dv-ip-ext {
+  margin-left: 3px;
+  font-size: 11px;
+  visibility: hidden;
+}
+
+.dv-ip-link:hover,
+.dv-ip-link:focus-visible {
+  color: #2f5bea;
+  text-decoration: underline;
+}
+
+.dv-ip-link:hover .dv-ip-ext,
+.dv-ip-link:focus-visible .dv-ip-ext {
+  visibility: visible;
+}
+
 .dv-table tr.dv-region td {
   padding: 9px 10px 7px;
   background: #f3f5fa;
