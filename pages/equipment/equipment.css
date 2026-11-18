@@ -1467,3 +1467,10 @@ body.eq-modal-open {
   color: var(--color-text-sub);
 }
 
+
+/* 시스템관리자 전용 통신 설정(IP·MAC·레지스터 주소)을 담당자가 볼 때 — 읽기 전용(equipment.js setCommSettingReadOnly) */
+input.eq-admin-only {
+  background-color: #f1f3f7;
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+}

@@ -13,7 +13,6 @@
             <main class="content content-narrow" id="content">
                 <div class="page-header">
                     <h1>장비 관리</h1>
-                    <p>장비 정보를 조회·등록·수정하고, 압축기·검사이력·수리일지를 관리합니다. 실시간 값이 아닌 등록 정보 관리 목적의 화면입니다.</p>
                 </div>
 
                 <div class="eq-layout">
@@ -56,9 +55,9 @@
                                         <col style="width: 174px" />
                                         <col style="width: 130px" />
                                         <col style="width: 90px" />
+                                        <col style="width: 100px" />
+                                        <col style="width: 100px" />
                                         <col style="width: 110px" />
-                                        <col style="width: 100px" />
-                                        <col style="width: 100px" />
                                     </colgroup>
                                     <thead>
                                         <tr>
@@ -67,9 +66,9 @@
                                             <th>장비명</th>
                                             <th>관리번호</th>
                                             <th>상태</th>
-                                            <th>압축기</th>
                                             <th>검사이력</th>
                                             <th>수리일지</th>
+                                            <th>모니터링</th>
                                         </tr>
                                     </thead>
                                     <tbody id="equipmentListBody">
@@ -355,8 +354,8 @@
             <div class="modal-box eq-compressor-popup-box">
                 <div class="modal-header eq-modal-header">
                     <div>
-                        <span class="eq-modal-eyebrow">Compressor</span>
-                        <h2 class="eq-modal-title">압축기 구성</h2>
+                        <span class="eq-modal-eyebrow">Monitoring</span>
+                        <h2 class="eq-modal-title">모니터링 설정</h2>
                         <p class="eq-compressor-popup-subtitle" id="cmpPopupEquipmentSubtitle"></p>
                     </div>
                     <button type="button" class="modal-close-btn" id="cmpPopupCloseX" aria-label="닫기">×</button>

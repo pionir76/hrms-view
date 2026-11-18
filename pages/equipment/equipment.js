@@ -15,7 +15,7 @@
 //                                                    "삭제" 개념 없음 — status: "철거"로 대체.
 //                                                    본문은 id/isRunning/communicationStatus/hasAlarm 제외한 전체 필드.
 //   GET  /api/equipments/{id}/compressors         — 압축기 목록(순번순 정렬)
-//   PUT  /api/compressors/{id}                    — { ipAddress, macAddress, sequenceNo } 수정. 담당 장비만(403).
+//   PUT  /api/compressors/{id}                    — { ipAddress, macAddress, sequenceNo } 수정. 담당 장비만(403). IP·MAC은 시스템관리자만(2026-11-18).
 //                                                    압축기 추가/삭제 API 자체가 없음 — 장비 등록 시점에만 개수 확정.
 //   GET  /api/compressors/{id}/channel-settings   — 채널 7개 설정 조회
 //   PUT  /api/compressors/{id}/channel-settings/{channelNo} — 채널 "1개씩" 수정(배열 전체 교체 아님). 담당 장비만(403).
@@ -282,9 +282,9 @@ function renderEquipmentList() {
           <td title="${fullLabel}"><span class="row-link" data-id="${e.id}">${escapeHtml(e.name)}</span></td>
           <td>${escapeHtml(e.managementNumber ?? "-")}</td>
           <td>${statusBadge(e.status)}</td>
-          <td><button type="button" class="eq-count-btn${compressorCount === 0 ? " eq-count-zero" : ""}" data-kind="compressor" data-id="${e.id}">COMP#${compressorCount}</button></td>
           <td><button type="button" class="eq-count-btn" data-kind="inspection" data-id="${e.id}">검사이력</button></td>
           <td><button type="button" class="eq-count-btn" data-kind="repair" data-id="${e.id}">수리일지</button></td>
+          <td><button type="button" class="eq-count-btn${compressorCount === 0 ? " eq-count-zero" : ""}" data-kind="compressor" data-id="${e.id}" title="압축기 ${compressorCount}대">설정</button></td>
         </tr>
       `;
     })
@@ -1064,6 +1064,8 @@ async function openCompressorDetail(compressorId) {
   setValue("cmSeq", compressor.sequenceNo);
   setValue("cmIp", compressor.ipAddress);
   setValue("cmMac", compressor.macAddress);
+  // IP·MAC은 시스템관리자 전용 — 담당자에게는 읽기 전용으로 보인다(서버도 바꾸면 403)
+  ["cmIp", "cmMac"].forEach((id) => setCommSettingReadOnly(document.getElementById(id)));
 
   // 압축기를 바꿀 때마다 표를 "불러오는 중" 한 줄로 통째로 비웠다가 새로 채우면, 표
   // 높이가 7행 → 1행 → 7행으로 출렁여서 화면이 깜빡이는 것처럼 보인다(캐시가 없어
@@ -1316,6 +1318,22 @@ function renderChannelSettingsTable(settings) {
   });
 }
 
+// 통신 설정(IP·MAC 주소, 채널 사용 여부·레지스터 주소)은 시스템관리자만 바꾼다(2026-11-18 현장 요청 —
+// 잘못 바꾸면 그 압축기 수집이 바로 끊긴다). 담당자는 경보 기준값 등 나머지만 고칠 수 있고, 이 칸들은
+// 읽기 전용으로 보인다. 서버(PUT api/compressors)도 같은 기준으로 막는다.
+const COMM_SETTING_ADMIN_ONLY = "시스템관리자만 수정할 수 있습니다.";
+
+function canEditCommSettings() {
+  return getSession()?.role === "시스템관리자";
+}
+
+function setCommSettingReadOnly(input) {
+  if (canEditCommSettings()) return;
+  input.readOnly = true;
+  input.classList.add("eq-admin-only");
+  input.title = COMM_SETTING_ADMIN_ONLY;
+}
+
 // 채널 "사용"이 꺼지면 그 행 전체(소수점/경보사용/경보하한/경보상한/발생지연/해제지연)를
 // 비활성화하고, "경보사용"이 꺼지면 경보 관련 항목(경보하한/경보상한/발생지연/해제지연)만
 // 비활성화한다. 값 자체는 지우지 않고 disabled만 걸어서, 다시 켰을 때 이전 설정이 그대로
@@ -1327,8 +1345,14 @@ function updateChannelRowDisabledState(row) {
 
   alarmBtn.disabled = !enabled;
   row.querySelector(".eq-ch-decimal").disabled = !enabled;
-  // 사용/주소는 한 쌍이다 — 끄면 서버가 주소를 null로 지운다(api-manual.md 25번)
-  row.querySelector(".eq-ch-register").disabled = !enabled;
+  // 사용/주소는 한 쌍이다 — 끄면 서버가 주소를 null로 지운다(api-manual.md 25번).
+  // 둘 다 통신 설정이라 시스템관리자 전용이다(2026-11-18) — 담당자에게는 읽기 전용
+  const enabledBtn = row.querySelector('.eq-ch-toggle-btn[data-field="enabled"]');
+  enabledBtn.disabled = !canEditCommSettings();
+  if (!canEditCommSettings()) enabledBtn.title = COMM_SETTING_ADMIN_ONLY;
+  const register = row.querySelector(".eq-ch-register");
+  register.disabled = !enabled;
+  setCommSettingReadOnly(register);
 
   const alarmFieldsDisabled = !enabled || !alarmEnabled;
   row.querySelector(".eq-ch-lower").disabled = alarmFieldsDisabled;
