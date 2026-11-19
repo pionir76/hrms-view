@@ -60,13 +60,12 @@
 
           <div class="panel">
             <div class="inspection-month-nav">
-              <button type="button" class="btn btn-secondary" id="prevMonthBtn" disabled>◀ 이전</button>
+              <button type="button" class="btn btn-secondary" id="prevMonthBtn">◀ 이전</button>
               <h2 id="calendarTitle">-</h2>
-              <button type="button" class="btn btn-secondary" id="nextMonthBtn" disabled>다음 ▶</button>
+              <button type="button" class="btn btn-secondary" id="nextMonthBtn">다음 ▶</button>
             </div>
-            <div class="table-scroll" id="calendarArea">
-              <div class="empty-state">좌측에서 지역 · 시설동 · 설비를 선택하세요.</div>
-            </div>
+            <!-- 캘린더는 장비 선택 전에도 항상 보인다 — 날짜만 있는 빈 캘린더를 inspection.js가 그린다 -->
+            <div class="table-scroll" id="calendarArea"></div>
           </div>
         </section>
       </div>

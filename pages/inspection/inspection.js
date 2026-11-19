@@ -33,19 +33,26 @@ const modalState = {
 async function initInspectionPage() {
   populateYearMonthSelects();
 
+  // 캘린더는 장비를 고르기 전에도 항상 보인다(2026-11-19 고객사 요청) — 날짜만 있는 빈 캘린더로 시작하고,
+  // 달 이동·년월 선택도 장비와 상관없이 쓸 수 있다.
+  document.getElementById("yearSelect").addEventListener("change", onYearMonthChange);
+  document.getElementById("monthSelect").addEventListener("change", onYearMonthChange);
+  document.getElementById("prevMonthBtn").addEventListener("click", () => changeMonth(-1));
+  document.getElementById("nextMonthBtn").addEventListener("click", () => changeMonth(1));
+  renderEmptyCalendar();
+
   try {
     // 담당 장비만 — 저장 권한이 담당 기준이라 목록도 같은 기준으로 맞춘다(백엔드 2026-09-28).
     // 시스템관리자는 mine=true여도 서버가 전체를 준다.
     state.equipments = await apiFetch("/api/equipments?mine=true");
   } catch (err) {
-    document.getElementById("calendarArea").innerHTML =
-      `<div class="empty-state">장비 목록을 불러오지 못했습니다. (${escapeHtml(err.message)})</div>`;
+    setPageNotice(`장비 목록을 불러오지 못했습니다. (${err.message})`);
     return;
   }
 
   // 담당 장비가 하나도 없으면 선택 자체가 불가능하다 — 화면이 고장 난 것으로 오해하지 않게 알려준다
   if (state.equipments.length === 0) {
-    renderCalendarPlaceholder("담당 장비가 없습니다. 시스템관리자에게 담당 장비 등록을 요청하세요.");
+    setPageNotice("담당 장비가 없습니다. 시스템관리자에게 담당 장비 등록을 요청하세요.");
   }
 
   populateRegionSelect();
@@ -53,8 +60,6 @@ async function initInspectionPage() {
   document.getElementById("regionSelect").addEventListener("change", onRegionChange);
   document.getElementById("buildingSelect").addEventListener("change", onBuildingChange);
   document.getElementById("equipmentSelect").addEventListener("change", onEquipmentChange);
-  document.getElementById("yearSelect").addEventListener("change", onYearMonthChange);
-  document.getElementById("monthSelect").addEventListener("change", onYearMonthChange);
 
   // 창은 닫기·× 버튼과 Esc로만 닫는다 — 바깥 클릭으로는 닫지 않는다(ui.js "창 닫기 공통 규칙")
   document.getElementById("modalCloseX").addEventListener("click", closeInspectionModal);
@@ -63,10 +68,6 @@ async function initInspectionPage() {
     if (!document.getElementById("inspectionModal").hidden) closeInspectionModal();
   });
 
-  document.getElementById("prevMonthBtn").addEventListener("click", () => changeMonth(-1));
-  document.getElementById("nextMonthBtn").addEventListener("click", () => changeMonth(1));
-
-  renderCalendarTitleOnly();
 }
 
 function populateYearMonthSelects() {
@@ -107,12 +108,13 @@ function onRegionChange() {
 
   resetSelect(equipmentSelect, "선택");
   state.equipmentId = null;
+  calendarNotice = "";
   renderEquipmentStatus(null);
-  renderSelectionSummary();
+  renderEmptyCalendar();
 
   if (!region) {
     resetSelect(buildingSelect, "선택");
-    renderCalendarPlaceholder("좌측에서 지역 · 시설동 · 설비를 선택하세요.");
+    renderSelectionSummary();
     return;
   }
 
@@ -122,7 +124,7 @@ function onRegionChange() {
   );
   buildingSelect.innerHTML = `<option value="">선택</option>` + buildings.map((b) => `<option value="${escapeHtml(b)}">${escapeHtml(b)}</option>`).join("");
   buildingSelect.disabled = false;
-  renderCalendarPlaceholder("좌측에서 시설동 · 설비를 선택하세요.");
+  renderSelectionSummary();
 }
 
 function onBuildingChange() {
@@ -131,12 +133,13 @@ function onBuildingChange() {
   const equipmentSelect = document.getElementById("equipmentSelect");
 
   state.equipmentId = null;
+  calendarNotice = "";
   renderEquipmentStatus(null);
-  renderSelectionSummary();
+  renderEmptyCalendar();
 
   if (!buildingName) {
     resetSelect(equipmentSelect, "선택");
-    renderCalendarPlaceholder("좌측에서 시설동 · 설비를 선택하세요.");
+    renderSelectionSummary();
     return;
   }
 
@@ -146,18 +149,19 @@ function onBuildingChange() {
   equipmentSelect.innerHTML =
     `<option value="">선택</option>` + equipments.map((e) => `<option value="${e.id}">${escapeHtml(e.name)}</option>`).join("");
   equipmentSelect.disabled = false;
-  renderCalendarPlaceholder("좌측에서 설비를 선택하세요.");
+  renderSelectionSummary();
 }
 
 function onEquipmentChange() {
   const equipmentSelect = document.getElementById("equipmentSelect");
   const equipmentId = equipmentSelect.value;
+  calendarNotice = "";
 
   if (!equipmentId) {
     state.equipmentId = null;
     renderSelectionSummary();
     renderEquipmentStatus(null);
-    renderCalendarPlaceholder("좌측에서 설비를 선택하세요.");
+    renderEmptyCalendar();
     return;
   }
 
@@ -168,16 +172,37 @@ function onEquipmentChange() {
   renderSelectionSummary();
   refreshEquipmentStatus(equipmentId, equipment ? equipment.status : null);
 
-  document.getElementById("prevMonthBtn").disabled = false;
-  document.getElementById("nextMonthBtn").disabled = false;
-
   loadCalendar();
 }
 
 function onYearMonthChange() {
   state.year = Number(document.getElementById("yearSelect").value);
   state.month = Number(document.getElementById("monthSelect").value);
+  refreshCalendar();
+}
+
+// 장비를 골랐으면 그 장비의 일지로 채우고, 아니면 날짜만 있는 빈 캘린더
+function refreshCalendar() {
   if (state.equipmentId) loadCalendar();
+  else renderEmptyCalendar();
+}
+
+// ---------- 선택 요약 줄 — 선택 경로 + 안내·오류 ----------
+//
+// 캘린더를 항상 보여주면서(2026-11-19) 예전에 캘린더 자리를 덮던 안내·오류 문구를 이 줄로 옮겼다.
+// pageNotice: 화면 전체에 걸린 문제(장비 목록 실패, 담당 장비 없음) — 선택을 바꿔도 남는다.
+// calendarNotice: 지금 고른 장비의 일지를 못 불러온 경우 — 선택을 바꾸면 지운다.
+let pageNotice = "";
+let calendarNotice = "";
+
+function setPageNotice(message) {
+  pageNotice = message;
+  renderSelectionSummary();
+}
+
+function setCalendarNotice(message) {
+  calendarNotice = message;
+  renderSelectionSummary();
 }
 
 // 지역 › 시설동 › 설비 요약 배지
@@ -185,9 +210,11 @@ function renderSelectionSummary() {
   const region = document.getElementById("regionSelect").value;
   const buildingName = document.getElementById("buildingSelect").value;
   const el = document.getElementById("selectionSummary");
+  const notice = pageNotice || calendarNotice;
+  const noticeHtml = notice ? `<span class="selection-notice">${escapeHtml(notice)}</span>` : "";
 
   if (!region) {
-    el.innerHTML = `<span class="selection-placeholder">지역 · 시설동 · 설비를 선택하세요.</span>`;
+    el.innerHTML = pageNotice ? noticeHtml : `<span class="selection-placeholder">지역 · 시설동 · 설비를 선택하세요.</span>`;
     return;
   }
 
@@ -195,7 +222,15 @@ function renderSelectionSummary() {
   if (buildingName) parts.push(buildingName);
   if (state.equipmentId && state.equipmentName) parts.push(equipmentNameWithManagementNo(state.equipmentName, state.managementNumber));
 
-  el.innerHTML = parts.map((p) => `<span class="selection-part">${escapeHtml(p)}</span>`).join(`<span class="selection-sep">›</span>`);
+  // 아직 덜 고른 단계를 이어서 알려준다(예전엔 캘린더 자리에 띄우던 안내)
+  let hint = "";
+  if (!buildingName) hint = "시설동 · 설비를 선택하세요.";
+  else if (!state.equipmentId) hint = "설비를 선택하세요.";
+
+  el.innerHTML =
+    parts.map((p) => `<span class="selection-part">${escapeHtml(p)}</span>`).join(`<span class="selection-sep">›</span>`) +
+    (hint ? `<span class="selection-hint">${hint}</span>` : "") +
+    noticeHtml;
 }
 
 // ---------- 우측 상단: 선택한 장비의 운영 상태 ----------
@@ -263,15 +298,7 @@ function changeMonth(delta) {
   document.getElementById("yearSelect").value = String(year);
   document.getElementById("monthSelect").value = String(month);
 
-  renderCalendarTitleOnly();
-  if (state.equipmentId) loadCalendar();
-}
-
-function renderCalendarPlaceholder(message) {
-  renderCalendarTitleOnly();
-  document.getElementById("prevMonthBtn").disabled = true;
-  document.getElementById("nextMonthBtn").disabled = true;
-  document.getElementById("calendarArea").innerHTML = `<div class="empty-state">${message}</div>`;
+  refreshCalendar();
 }
 
 // ---------- 날짜 유틸 ----------
@@ -343,44 +370,81 @@ function deriveWeekStatus(log) {
 
 async function loadCalendar() {
   const { equipmentId, year, month } = state;
+  const seq = ++calendarRequestSeq;
   renderCalendarTitleOnly();
 
+  // 불러오는 동안 캘린더를 덮지 않고 옅게만 한다. 같은 장비·같은 달을 다시 불러올 때(저장·결재 뒤)는
+  // 지금 내용을 그대로 두고, 장비나 달이 바뀌었으면 날짜만 있는 빈 캘린더부터 그린다
+  // (앞 장비의 버튼·배지가 잠깐이라도 새 장비 것처럼 보이지 않게).
   const calendarArea = document.getElementById("calendarArea");
-  calendarArea.innerHTML = `<div class="empty-state">불러오는 중...</div>`;
-
   const weeks = getMonthWeeks(year, month);
-  const weekStarts = weeks.map((w) => toDateStr(w[0]));
+  if (calendarArea.dataset.key !== calendarKey()) renderCalendarTable(weeks, null, month);
+  calendarArea.classList.add("is-loading");
 
+  const weekStarts = weeks.map((w) => toDateStr(w[0]));
+  const today = todayDateString();
+
+  // 아직 시작하지 않은 주(일요일이 내일 이후)는 쓸 일지가 없어 조회하지 않는다(2026-11-19)
   let logs;
   try {
     logs = await Promise.all(
-      weekStarts.map((ws) => apiFetch(`/api/inspection-logs?equipmentId=${equipmentId}&weekStart=${ws}`))
+      weekStarts.map((ws) => (ws > today ? null : apiFetch(`/api/inspection-logs?equipmentId=${equipmentId}&weekStart=${ws}`)))
     );
   } catch (err) {
-    calendarArea.innerHTML = `<div class="empty-state">불러오지 못했습니다. (${escapeHtml(err.message)})</div>`;
+    if (seq !== calendarRequestSeq) return;
+    calendarArea.classList.remove("is-loading");
+    setCalendarNotice(`점검일지를 불러오지 못했습니다. (${err.message})`);
     return;
   }
 
+  // 기다리는 사이 장비·달을 바꿨으면 늦게 온 응답은 버린다 — 나중에 고른 쪽 결과만 그린다
+  if (seq !== calendarRequestSeq) return;
+  calendarArea.classList.remove("is-loading");
+  if (calendarNotice) setCalendarNotice(""); // 앞서 실패했던 안내는 이번에 성공했으니 지운다
   renderCalendarTable(weeks, logs, month);
 }
 
+// 장비·달을 빨리 바꿀 때 먼저 보낸 조회가 늦게 와서 나중 선택을 덮지 않게 하는 번호(마지막 요청만 반영)
+let calendarRequestSeq = 0;
+
+// 지금 캘린더에 그려진 내용이 어느 장비·어느 달 것인지 — 빈 캘린더는 ""
+function calendarKey() {
+  return `${state.equipmentId}|${state.year}-${state.month}`;
+}
+
+// 장비를 고르기 전(또는 선택을 풀었을 때)의 캘린더 — 날짜·오늘 표시만 있고 버튼·배지는 없다
+function renderEmptyCalendar() {
+  calendarRequestSeq += 1; // 진행 중이던 조회 결과는 버린다
+  renderCalendarTitleOnly();
+  document.getElementById("calendarArea").classList.remove("is-loading");
+  renderCalendarTable(getMonthWeeks(state.year, state.month), null, state.month);
+}
+
+// logs가 null이면 빈 캘린더(장비 미선택·불러오는 중)다.
+// 미래 날짜(내일 이후)에는 "작성" 버튼을 두지 않는다 — 이번 주는 오늘까지의 칸으로 그 주 일지를 연다.
+// 아직 시작하지 않은 주는 결재 칸도 비운다(2026-11-19 고객사 요청).
 function renderCalendarTable(weeks, logs, month) {
+  const today = todayDateString();
+  const hasData = logs !== null;
   const rows = weeks
     .map((week, i) => {
-      const status = deriveWeekStatus(logs[i]);
       const weekStart = toDateStr(week[0]);
+      const weekNotStarted = weekStart > today;
+      const status = !hasData || weekNotStarted ? null : deriveWeekStatus(logs[i]);
       const dayCells = week
         .map((d, dow) => {
           if (d.getMonth() + 1 !== month) {
             return `<td class="cal-empty"></td>`;
           }
           // 오늘 칸은 운전일지 캘린더와 같은 모양으로 표시한다(2026-11-17 현장 요청)
-          const isToday = toDateStr(d) === todayDateString();
+          const dateStr = toDateStr(d);
+          const isToday = dateStr === today;
           const cls = [dow === 0 ? "cal-sun" : dow === 6 ? "cal-sat" : "", isToday ? "cal-today" : ""].filter(Boolean).join(" ");
+          const writeBtn = !hasData || dateStr > today ? "" : `<button type="button" class="cal-write-btn" data-week-start="${weekStart}">작성</button>`;
           return `
             <td class="${cls}">
-              <div class="cal-date">${isToday ? `<span class="cal-today-num">${d.getDate()}</span><span class="cal-today-tag">오늘</span>` : d.getDate()}</div>
-              <button type="button" class="cal-write-btn" data-week-start="${weekStart}">작성</button>
+              <div class="cal-date"><span class="cal-date-num">${d.getDate()}</span></div>
+              ${writeBtn}
             </td>
           `;
         })
@@ -389,13 +453,15 @@ function renderCalendarTable(weeks, logs, month) {
       return `
         <tr>
           ${dayCells}
-          <td><span class="badge ${status.badgeClass}">${status.label}</span></td>
+          <td>${status ? `<span class="badge ${status.badgeClass}">${status.label}</span>` : ""}</td>
         </tr>
       `;
     })
     .join("");
 
-  document.getElementById("calendarArea").innerHTML = `
+  const calendarArea = document.getElementById("calendarArea");
+  calendarArea.dataset.key = hasData ? calendarKey() : "";
+  calendarArea.innerHTML = `
     <table class="data-table inspection-calendar">
       <thead>
         <tr>
