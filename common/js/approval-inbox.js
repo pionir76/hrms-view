@@ -107,6 +107,7 @@ function ensureApprovalModal() {
     if (item) selectApprovalGroup(item.dataset.docType);
   });
   modal.querySelector("#apListScroll").addEventListener("click", (event) => {
+    if (event.target.closest("a.ap-item-link")) return; // 제목 링크는 새 탭으로 열기만 — 선택은 바꾸지 않는다
     const row = event.target.closest("[data-id]");
     if (row) toggleApprovalItem(Number(row.dataset.id));
   });
@@ -116,6 +117,10 @@ function ensureApprovalModal() {
   // 이 창은 다른 화면의 문서 창 위에 겹칠 수 있어, 화면 쪽 Esc 처리는 isApprovalInboxOpen()으로 이 창이 열려 있으면 건너뛴다.
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && !modal.hidden) closeApprovalInbox();
+  });
+  // 제목 링크로 연 탭에서 결재·수정하고 돌아오면 목록이 달라졌을 수 있다 — 이 창이 열려 있으면 다시 불러온다
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && !modal.hidden && !approvalInbox.loading) loadApprovalPending();
   });
   return modal;
 }
@@ -158,7 +163,9 @@ async function loadApprovalPending() {
     const firstWithItems = approvalInbox.groups.find((g) => g.count > 0) || approvalInbox.groups[0];
     approvalInbox.activeType = firstWithItems ? firstWithItems.docType : null;
   }
-  approvalInbox.selected.clear();
+  // 고른 항목은 새 목록에 아직 있는 것만 남긴다(링크로 다른 탭을 보고 돌아와도 선택이 사라지지 않게)
+  const activeIds = new Set((activeApprovalGroup()?.items || []).map((item) => item.id));
+  approvalInbox.selected = new Set([...approvalInbox.selected].filter((id) => activeIds.has(id)));
   renderApprovalBadge();
   renderApprovalGroups();
   renderApprovalList();
@@ -210,7 +217,7 @@ function renderApprovalList() {
                 <tr data-id="${item.id}" class="${checked ? "selected" : ""}">
                   <td><span class="ap-box-check${checked ? " checked" : ""}">${checked ? "✓" : ""}</span></td>
                   <td>
-                    <span class="ap-item-title">${escapeHtml(item.title)}</span>
+                    ${approvalItemTitleHtml(group.docType, item)}
                     ${item.subtitle ? `<span class="ap-item-sub">${escapeHtml(item.subtitle)}</span>` : ""}
                     ${item.authorName ? `<span class="ap-item-sub">작성자 ${escapeHtml(item.authorName)}</span>` : ""}
                   </td>
@@ -224,6 +231,27 @@ function renderApprovalList() {
     `;
   }
   renderApprovalSelectionState();
+}
+
+// 문서 제목을 누르면 그 문서를 새 탭으로 연다(2026-11-19 고객사 요청). 각 화면이 주소의 값을 읽어
+// 장비·날짜를 고르고 문서 창을 바로 띄운다. 72번 항목의 equipmentId·date(2026-11-19 백엔드 추가)를 쓴다 —
+// 값이 없으면(예전 서버) 링크 없이 글자만 둔다. 모든 화면이 pages/{이름}/ 아래라 상대 경로로 간다.
+function approvalItemUrl(docType, item) {
+  const q = (params) => new URLSearchParams(params).toString();
+  if (docType === "TrainingLog") return `../training/training.html?${q({ id: item.id })}`;
+  if (!item.equipmentId) return null;
+  if (docType === "RepairLog") return `../equipment/equipment.html?${q({ repair: item.equipmentId, repairId: item.id })}`;
+  if (!item.date) return null;
+  if (docType === "InspectionLog") return `../inspection/inspection.html?${q({ equipment: item.equipmentId, week: item.date })}`;
+  if (docType === "OperationLog") return `../operation/operation.html?${q({ equipment: item.equipmentId, date: item.date })}`;
+  return null;
+}
+
+function approvalItemTitleHtml(docType, item) {
+  const url = approvalItemUrl(docType, item);
+  const title = escapeHtml(item.title);
+  if (!url) return `<span class="ap-item-title">${title}</span>`;
+  return `<a class="ap-item-title ap-item-link" href="${escapeHtml(url)}" target="_blank" rel="noopener" title="새 탭에서 문서 열기">${title}<span class="ap-item-link-icon">↗</span></a>`;
 }
 
 function renderApprovalSelectionState() {

@@ -296,6 +296,12 @@
   text-align: left;
 }
 
+/* 점검내용은 단어 중간에서 끊기지 않게(한글도 띄어쓰기에서만 줄바꿈, 2026-11-19 고객사 요청).
+   3번·4-2번은 정해 둔 자리에서 줄을 바꾼다(inspection.js INSPECTION_CONTENT_LINE_BREAK_AFTER). */
+.inspection-item-text {
+  word-break: keep-all;
+}
+
 /* 4-1~4-3, 6-1~6-3처럼 세부 항목을 묶는 rowspan 셀(번호/점검항목) */
 .inspection-table td[rowspan] {
   vertical-align: middle;

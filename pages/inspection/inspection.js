@@ -63,6 +63,25 @@ async function initInspectionPage() {
     if (!document.getElementById("inspectionModal").hidden) closeInspectionModal();
   });
 
+  await openLogFromUrl();
+}
+
+// 일괄 결재 목록의 문서 제목 링크(새 탭)로 들어온 경우 — ?equipment={장비id}&week={주 시작 일요일} (2026-11-19).
+// 그 장비·그 달을 고르고 그 주 점검일지 창을 바로 연다. 새로 고침해도 다시 열리지 않게 주소는 비운다.
+async function openLogFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const equipmentId = params.get("equipment");
+  const week = params.get("week");
+  if (!equipmentId || !week) return;
+  window.history.replaceState(null, "", window.location.pathname);
+
+  moveCalendarToDate(week);
+  const equipment = await pickEquipmentFromLink(equipmentId, applyEquipmentScope);
+  if (!equipment) {
+    window.alert("이 장비의 점검일지를 찾을 수 없습니다.");
+    return;
+  }
+  openInspectionModal(week);
 }
 
 function populateYearMonthSelects() {
@@ -647,10 +666,11 @@ function renderModalBody() {
     <div class="opinion-block">
       <label for="opinionTextarea">점검자 의견</label>
       <textarea id="opinionTextarea" class="opinion-textarea" placeholder="특이사항을 기록하세요." ${locked ? "disabled" : ""}>${escapeHtml(modalState.opinion)}</textarea>
+      <!-- 양식 하단 부연설명(2026-11-19 고객사 문구로 교체) — 엑셀 저장 때도 이 글자를 그대로 옮긴다 -->
       <p class="opinion-note">
-        불필요 항목에는 [해당없음(N)] 으로 표시<br />
-        점검내용에 대한 세부점검 내용은 사업자가 현소환경에 적정하게 작성·성안하여 함.<br />
-        안전점검확인서의 결과가 동일적으로 근관한 경우 사업소의 자체 위임 점검규정에 따를수 있다. 이하 기타 일치도 동일하게 적용한다.
+        1. 불필요 항목에는 [해당없음(/)] 으로 표시<br />
+        2. 각 점검내용에 대한 세부점검 내용은 사업자가 업소실정에 적정하게 작성하여야 함.<br />
+        3. 안전관리총괄자의 결재가 통상적으로 곤란한 경우 사업소의 자체 위임 전결규정에 따를수 있다. 이하 기타 일지도 동일하게 적용한다.
       </p>
     </div>
 
@@ -696,10 +716,26 @@ function showModalError(err) {
 
 // ---------- 결재 바 ----------
 
+// 작성이 끝나지 않은 일지는 결재할 수 없다(2026-11-19, 서버 14번 409 본문과 같은 문구)
+const NOT_WRITTEN_BLOCK_MESSAGE = "작성이 끝나지 않은 일지는 결재할 수 없습니다.";
+
+// 작성 완료 = 10개 항목 × 일~토가 모두 O·X·/ 중 하나로 채워짐(서버 기준과 같다 — 서버는 12번 isWritingComplete로
+// 저장된 값 기준을 내려주지만, 화면은 지금 입력 중인 값으로 바로 판정한다. 결재를 누르면 저장 안 한 입력은
+// 먼저 저장하므로(confirmBeforeApprove) 두 판정이 어긋나지 않는다).
+function isInspectionWritingComplete() {
+  return (
+    modalState.results.length > 0 &&
+    modalState.results.every((r) => DAY_KEYS.every((day) => r[day] !== null && r[day] !== undefined && r[day] !== ""))
+  );
+}
+
 function renderInspectionApprovalBar() {
   renderApprovalBar(document.getElementById("approvalBar"), modalState, {
     allowApprove: modalState.id !== null && !isViewOnlyDoc(), // 저장 전 문서·담당이 아닌 장비는 결재할 수 없다
     allowCancel: !isViewOnlyDoc(),
+    // 작성 미완료는 첫 결재 단계 버튼만 막는다(서버 기준 2026-11-19 — 그 뒤 단계는 앞 단계 결재 여부만 본다)
+    approveBlockedReason: (levelKey) =>
+      levelKey === firstApprovalLevelKey(modalState) && !isInspectionWritingComplete() ? NOT_WRITTEN_BLOCK_MESSAGE : null,
     onApprove: approveLevel,
     onCancel: cancelApproval,
   });
@@ -782,6 +818,23 @@ function groupResultsByItem(results) {
   return groups;
 }
 
+// 점검내용 중 줄을 바꿀 자리를 정해 둔 항목(2026-11-19 고객사 요청) — 이 글자 바로 뒤 띄어쓰기에서 다음 줄로 넘긴다.
+// 문구 자체는 서버(GET /api/inspection-items)가 주는 그대로이고, 화면·엑셀(셀 안 <br> → 줄바꿈)에서만 끊는다.
+// 나머지 줄바꿈은 CSS(.inspection-item-text, word-break: keep-all)로 단어 사이에서만 일어난다.
+const INSPECTION_CONTENT_LINE_BREAK_AFTER = {
+  "3": "적정 상태,", // 탈/부착 용이한 구조 등 안전밸브 적정 상태, ⏎ 가용전 상태
+  "4-2": "방지장치,", // 과부하 보호장치, 액체동결 방지장치, ⏎ 냉각수 단수 보호장치 작동여부
+};
+
+function inspectionContentHtml(r) {
+  const content = r.content ?? "";
+  const breakAfter = INSPECTION_CONTENT_LINE_BREAK_AFTER[r.itemNo];
+  const at = breakAfter ? content.indexOf(`${breakAfter} `) : -1;
+  if (at === -1) return escapeHtml(content); // 서버 문구가 바뀌어 자리를 못 찾으면 끊지 않는다
+  const cut = at + breakAfter.length;
+  return `${escapeHtml(content.slice(0, cut))}<br />${escapeHtml(content.slice(cut + 1))}`;
+}
+
 function renderInspectionTable() {
   const locked = isDocLocked(modalState);
   const tbody = document.getElementById("inspectionTableBody");
@@ -810,7 +863,7 @@ function renderInspectionTable() {
       rowsHtml.push(`
         <tr>
           ${leadingCells}
-          <td class="item-content">${escapeHtml(r.content)}</td>
+          <td class="item-content inspection-item-text">${inspectionContentHtml(r)}</td>
           ${dayCells}
           <td class="item-content"><input type="text" class="memo-input" data-idx="${idx}" value="${escapeHtml(r.memo || "")}" ${locked ? "disabled" : ""} /></td>
         </tr>
@@ -829,6 +882,7 @@ function renderInspectionTable() {
         modalState.results[idx][day] = next;
         btn.innerHTML = oxToggleSymbol(next);
         btn.className = `ox-toggle-btn ${oxCellClass(next)}`;
+        renderInspectionApprovalBar(); // 마지막 칸을 채우면 결재 버튼이 바로 풀린다(작성 완료 판정)
       });
     });
 

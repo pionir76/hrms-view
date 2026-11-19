@@ -64,7 +64,20 @@ function initTrainingPage() {
     if (!document.getElementById("trainingModal").hidden) closeTrainingModal();
   });
 
-  loadTrainingList();
+  loadTrainingList().then(openTrainingFromUrl);
+}
+
+// 일괄 결재 목록의 문서 제목 링크(새 탭)로 들어온 경우 — ?id= (2026-11-19). 그 문서 창을 바로 연다.
+// 새로 고침해도 다시 열리지 않게 주소는 비운다.
+function openTrainingFromUrl() {
+  const id = new URLSearchParams(window.location.search).get("id");
+  if (!id) return;
+  window.history.replaceState(null, "", window.location.pathname);
+  if (!state.items.some((i) => String(i.id) === String(id))) {
+    window.alert("문서를 찾을 수 없습니다. 삭제되었을 수 있습니다.");
+    return;
+  }
+  openTrainingDetail(id);
 }
 
 async function loadTrainingList() {

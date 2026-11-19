@@ -2305,6 +2305,28 @@ select::-ms-expand {
   font-weight: 600;
 }
 
+/* 문서 제목 링크 — 누르면 그 일지를 새 탭으로 연다(2026-11-19). 줄 선택(체크)과 구분되게 밑줄·↗로 표시 */
+a.ap-item-link {
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+a.ap-item-link:hover {
+  color: var(--color-primary);
+  text-decoration: underline;
+}
+
+.ap-item-link-icon {
+  margin-left: 4px;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+a.ap-item-link:hover .ap-item-link-icon {
+  color: var(--color-primary);
+}
+
 .ap-item-sub {
   display: block;
   font-size: 11.5px;

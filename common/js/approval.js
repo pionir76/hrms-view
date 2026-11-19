@@ -12,7 +12,8 @@
 // 사용법:
 //   renderApprovalBar(document.getElementById("approvalBar"), doc, {
 //     allowApprove: doc.id !== null,   // 저장 전 문서는 결재 자체가 불가능
-//     approveBlockedReason: null,      // 결재 차례지만 막힌 경우의 사유 — 버튼을 비활성으로 두고 사유 툴팁을 단다
+//     approveBlockedReason: null,      // 결재 차례지만 막힌 경우의 사유 — 버튼을 비활성으로 두고 사유 툴팁을 단다.
+//                                      // 문자열이면 모든 단계에, 함수 (levelKey) => 사유|null이면 단계별로 정한다
 //     onApprove: (levelKey) => {...},
 //     onCancel: (levelKey) => {...},
 //   });
@@ -37,6 +38,13 @@ function isApprovalStarted(doc) {
 
 function isApprovalComplete(doc) {
   return APPROVAL_LEVEL_KEYS.every((key) => isApprovalLevelDone(doc?.[key]));
+}
+
+// 그 문서의 "첫 결재 단계" — level1 → level2 → level3 순으로 해당없음·전결이 아닌 첫 단계(백엔드 api-manual 10번,
+// 2026-11-19). 결재 단계 구성은 문서유형마다 달라서(예: 교육훈련은 1단계가 해당없음) 번호로 고정하지 않는다.
+// 작성 완료 검사(점검일지·운전일지)는 이 단계의 결재에서만 한다 — 첫 단계를 통과하면 문서가 잠기기 때문.
+function firstApprovalLevelKey(doc) {
+  return APPROVAL_LEVEL_KEYS.find((key) => doc?.[key] && doc[key].status !== "NotApplicable" && doc[key].status !== "Delegated") ?? null;
 }
 
 // 결재하기 전에 저장 안 된 변경을 처리한다(사용자 결정 2026-09-28).
@@ -105,11 +113,12 @@ function renderApprovalBar(el, doc, options = {}) {
     } else {
       const lowerDone = APPROVAL_LEVEL_KEYS.slice(0, idx).every((k) => isApprovalLevelDone(target[k]));
       const canApprove = allowApprove && lowerDone && session && session.role === roleLabel;
-      if (canApprove && approveBlockedReason) {
-        // 내 차례지만 문서 사정으로 막힘(예: 운전일지 미가동·21시 전) — 버튼은 보이되 비활성, 사유는 툴팁.
+      const blockedReason = typeof approveBlockedReason === "function" ? approveBlockedReason(key) : approveBlockedReason;
+      if (canApprove && blockedReason) {
+        // 내 차례지만 문서 사정으로 막힘(예: 운전일지 미가동·21시 전, 첫 단계의 작성 미완료) — 버튼은 보이되 비활성, 사유는 툴팁.
         // 비활성 버튼은 마우스 이벤트를 받지 않으므로 툴팁은 감싼 span이 띄운다.
         inner = `
-          <span class="approval-blocked" data-tip="${escapeHtml(approveBlockedReason)}" aria-label="${escapeHtml(approveBlockedReason)}">
+          <span class="approval-blocked" data-tip="${escapeHtml(blockedReason)}" aria-label="${escapeHtml(blockedReason)}">
             <button type="button" class="btn btn-primary approval-approve-btn" disabled>결재</button>
           </span>
         `;

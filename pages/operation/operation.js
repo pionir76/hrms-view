@@ -10,6 +10,7 @@ const SLOT_OPEN_GRACE_MS = 60 * 1000;
 // 운전일지 결재를 막는 사유 — 백엔드 OperationLogRules와 같은 문구(api-manual 19번 409 본문)
 const IDLE_BLOCK_MESSAGE = "미가동일은 결재 대상이 아닙니다.";
 const NOT_FINISHED_BLOCK_MESSAGE = "21시 기록이 끝난 뒤에 결재할 수 있습니다.";
+const NOT_WRITTEN_BLOCK_MESSAGE = "작성이 끝나지 않은 일지는 결재할 수 없습니다."; // 2026-11-19, 서버 19번 409 본문과 같은 문구
 
 // 사업소 공통 서식의 "비고" 문구 (원문 그대로 4개 항목 전부 포함).
 const OPERATION_NOTE_TEXT = [
@@ -159,6 +160,27 @@ async function initOperationPage() {
     else if (!document.getElementById("operationModal").hidden) closeOperationModal();
   });
 
+  await openLogFromUrl();
+}
+
+// 일괄 결재 목록의 문서 제목 링크(새 탭)로 들어온 경우 — ?equipment={장비id}&date={일자} (2026-11-19).
+// 그 장비·그 달을 고르고(압축기 정보까지 받은 뒤) 그날 운전일지 창을 바로 연다. 새로 고침해도 다시 열리지 않게 주소는 비운다.
+// 운전일지 화면은 운영 장비만 고를 수 있어서, 그 사이 운영이 아니게 된 장비의 일지는 여기서 열 수 없다.
+async function openLogFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const equipmentId = params.get("equipment");
+  const date = params.get("date");
+  if (!equipmentId || !date) return;
+  window.history.replaceState(null, "", window.location.pathname);
+
+  moveCalendarToDate(date);
+  const equipment = await pickEquipmentFromLink(equipmentId, applyEquipmentScope);
+  if (!equipment) {
+    window.alert("이 장비의 운전일지를 찾을 수 없습니다. (운전일지 화면은 장비 상태가 '운영'인 장비만 보여줍니다)");
+    return;
+  }
+  if (String(state.compressorsEquipmentId) !== String(equipmentId)) return; // 압축기 정보를 못 받음 — 요약 줄에 안내가 떠 있다
+  openOperationModal(date);
 }
 
 function populateYearMonthSelects() {
@@ -484,10 +506,28 @@ function isSlotPending(dateStr, slot) {
 }
 
 // 결재 차례인 사람에게 버튼을 비활성으로 보여줄 사유(툴팁). 막지 않으면 null. 서버도 같은 기준으로 409를 낸다.
-function operationApproveBlockReason() {
+// 사유가 여럿이면 서버와 같은 순서(미가동 → 21시 전 → 작성 미완료)로 첫 번째만 보여준다.
+// 미가동·21시 전은 모든 단계에, 작성 미완료는 첫 결재 단계에만 적용한다(서버 기준 2026-11-19 —
+// 첫 단계를 통과하면 문서가 잠겨 작성 완료 상태가 유지되므로 그 뒤 단계는 앞 단계 결재 여부만 본다).
+function operationApproveBlockReason(levelKey) {
   if (modalState.isIdle) return IDLE_BLOCK_MESSAGE;
   if (isSlotPending(modalState.date, "time2100")) return NOT_FINISHED_BLOCK_MESSAGE;
+  if (levelKey === firstApprovalLevelKey(modalState) && !isOperationWritingComplete()) return NOT_WRITTEN_BLOCK_MESSAGE;
   return null;
+}
+
+// 작성 완료 = 사람이 직접 적는 체크 항목 6개(kind "ox")가 4개 시각 모두 채워짐(2026-11-19, 서버 기준과 같다 —
+// 서버는 17번 isWritingComplete로 저장된 값 기준을 내려주지만, 화면은 지금 입력 중인 값으로 바로 판정한다.
+// 결재를 누르면 저장 안 한 입력은 먼저 저장하므로(confirmBeforeApprove) 두 판정이 어긋나지 않는다).
+const OPERATION_WRITTEN_ITEM_KEYS = OPERATION_CATALOG.flatMap((group) => group.items).filter((item) => item.kind === "ox").map((item) => item.key);
+
+function isOperationWritingComplete() {
+  return OPERATION_WRITTEN_ITEM_KEYS.every((key) =>
+    TIME_SLOTS.every((slot) => {
+      const value = getItemSlotRaw(key, null, slot);
+      return value !== null && value !== undefined && value !== "";
+    })
+  );
 }
 
 // 저장 안 한 채 닫거나 결재하면 입력이 사라지므로, 연 시점 값을 기준으로 잡아 비교한다
@@ -864,7 +904,7 @@ function renderOperationApprovalBar() {
   renderApprovalBar(document.getElementById("approvalBar"), modalState, {
     allowApprove: modalState.id !== null && !isViewOnlyDoc(), // 저장 전 문서·담당이 아닌 장비는 결재할 수 없다
     allowCancel: !isViewOnlyDoc(),
-    approveBlockedReason: operationApproveBlockReason(), // 미가동·21시 전이면 버튼 비활성 + 사유 툴팁
+    approveBlockedReason: operationApproveBlockReason, // 단계별 판정 — 미가동·21시 전·(첫 단계만) 작성 미완료면 버튼 비활성 + 사유 툴팁
     onApprove: approveLevel,
     onCancel: cancelApproval,
   });
@@ -1105,6 +1145,7 @@ function wireTableEvents(tbody) {
       setItemSlotRaw(itemKey, null, slot, next);
       btn.innerHTML = oxToggleSymbol(next);
       btn.className = `ox-toggle-btn ${oxCellClass(next)}`;
+      renderOperationApprovalBar(); // 마지막 칸을 채우면 결재 버튼이 바로 풀린다(작성 완료 판정)
     });
   });
 

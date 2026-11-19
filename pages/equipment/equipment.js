@@ -129,6 +129,27 @@ async function initEquipmentPage() {
   initEquipmentFilters();
   renderEquipmentList();
   await openChannelFromUrl();
+  await openRepairFromUrl();
+}
+
+// 일괄 결재 목록의 문서 제목 링크(새 탭)로 들어온 경우 — ?repair={장비id}&repairId={수리일지id} (2026-11-19).
+// 그 장비의 수리일지 창을 열고 해당 문서를 고른다. 새로 고침해도 다시 열리지 않게 주소는 비운다.
+async function openRepairFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const equipmentId = params.get("repair");
+  if (!equipmentId) return;
+  const repairId = params.get("repairId");
+  window.history.replaceState(null, "", window.location.pathname);
+
+  if (!findEquipment(equipmentId)) {
+    window.alert("장비를 찾을 수 없습니다.");
+    return;
+  }
+  await openRepairPopup(equipmentId);
+  if (repairId && repairPopupState.items.some((i) => String(i.id) === String(repairId))) {
+    openRepairDetail(repairId);
+    renderRepairList();
+  }
 }
 
 // 이벤트 상세 창의 "경보 범위 설정 ↗" 링크로 들어온 경우(?equipment=&compressor=&channel=, 2026-10-22) —
