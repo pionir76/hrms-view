@@ -17,6 +17,11 @@
 
                 <div class="eq-layout">
                     <aside class="eq-left">
+                        <!-- 조회 범위(담당 장비만 / 전체). 시스템관리자는 전체 권한이라 숨긴다(equipment.js) -->
+                        <div class="eq-scope-switch" id="eqScopeSwitch" role="group" aria-label="조회 범위" hidden>
+                            <button type="button" class="eq-scope-opt" data-scope="mine">내 장비</button>
+                            <button type="button" class="eq-scope-opt" data-scope="all">전체 장비</button>
+                        </div>
                         <div class="field">
                             <label for="eqFilterRegion">지역</label>
                             <select id="eqFilterRegion">
@@ -39,8 +44,9 @@
                             <label for="eqFilterSearch">장비명 검색</label>
                             <input type="text" id="eqFilterSearch" placeholder="장비명으로 검색" />
                         </div>
-                        <div class="eq-left-divider"></div>
-                        <button type="button" class="btn btn-primary" id="eqAddBtn">+ 신규 등록</button>
+                        <!-- 구분선·신규 등록은 시스템관리자에게만 보인다(장비 등록 API가 시스템관리자 전용, equipment.js) -->
+                        <div class="eq-left-divider" id="eqAdminDivider" hidden></div>
+                        <button type="button" class="btn btn-primary" id="eqAddBtn" hidden>+ 신규 등록</button>
                         <!-- 시스템관리자에게만 보인다(equipment-bulk-inspection.js) -->
                         <button type="button" class="btn btn-danger" id="eqBulkInspectionBtn" hidden>검사이력 일괄등록</button>
                     </aside>
@@ -97,6 +103,7 @@
                 </div>
                 <div class="modal-body eq-modal-body">
                     <div class="eq-error" id="equipmentFormError" hidden></div>
+                    <div class="eq-viewonly-notice" id="equipmentViewOnlyNotice" hidden></div>
 
                     <div class="eq-detail-split">
                         <div class="eq-detail-left">
@@ -312,6 +319,7 @@
                 <div class="modal-header">냉각수 · 브라인 · 전압 설정</div>
                 <div class="modal-body">
                     <div class="eq-error" id="rangeSettingsError" hidden></div>
+                    <div class="eq-viewonly-notice" id="rangeViewOnlyNotice" hidden></div>
                     <p class="eq-range-warning">이 화면에서 입력한 값은 운전일지 자동 기록에만 쓰이며, 장비 일반 설정 화면 어디에도 표시되지 않습니다.</p>
 
                     <div class="eq-range-group">
@@ -362,6 +370,7 @@
                 </div>
                 <div class="modal-body">
                     <div class="eq-error" id="cmpPopupError" hidden></div>
+                    <div class="eq-viewonly-notice" id="cmpViewOnlyNotice" hidden></div>
 
                     <div class="eq-compressor-split">
                         <aside class="eq-compressor-list-panel">
@@ -446,6 +455,7 @@
                 </div>
                 <div class="modal-body">
                     <div class="eq-error" id="ihPopupError" hidden></div>
+                    <div class="eq-viewonly-notice" id="ihViewOnlyNotice" hidden></div>
 
                     <div class="eq-detail-split">
                         <div class="eq-detail-left">
@@ -508,6 +518,7 @@
                     <button type="button" class="modal-close-btn" id="rlPopupCloseX" aria-label="닫기">×</button>
                 </div>
                 <div class="modal-body">
+                    <div class="eq-viewonly-notice" id="rlViewOnlyNotice" hidden></div>
                     <div class="eq-detail-split">
                         <div class="eq-detail-left">
                             <button type="button" class="btn btn-primary eq-inspection-add-btn" id="rlAddNewBtn">+ 신규작성</button>

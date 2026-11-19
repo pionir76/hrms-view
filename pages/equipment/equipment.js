@@ -29,9 +29,88 @@
 const EQUIPMENT_STATUSES = ["운영", "미운영", "수리중", "점검중", "철거예정", "철거", "사용중지", "기타"];
 
 const state = {
-  equipments: [], // GET /api/equipments
+  equipments: [], // GET /api/equipments — 전체 장비(2026-11-19부터 담당이 아니어도 조회 가능)
+  myEquipmentIds: new Set(), // GET /api/equipments?mine=true의 id(문자열) — 입력·설정 권한 판정 기준
+  scope: "mine", // 목록 조회 범위: "mine"(내 장비) | "all"(전체 장비)
   page: 1, // 목록 페이지(공통 paginate/renderPager 사용)
 };
+
+// ---------- 조회 범위 / 담당 장비 권한 (2026-11-19 고객사 요청) ----------
+//
+// 담당이 아닌 장비도 목록·이력카드·센서 설정·검사이력·수리일지를 "볼" 수는 있다. 입력·설정은
+// 담당 장비만 — 화면을 열되 입력칸을 막고 저장·신규작성·사진·첨부·결재 버튼을 숨긴다.
+// 장비·압축기·채널·사진은 서버도 담당 기준으로 403을 주지만, 검사이력·수리일지 등록은 서버가
+// 담당 여부를 보지 않는다(작성자 기준) — 그 둘은 이 화면에서만 막는다(사용자 결정: 프론트만).
+// 시스템관리자는 전체 권한이라 전부 "내 장비"로 보고 범위 전환 버튼도 숨긴다.
+
+const EQUIPMENT_SCOPE_STORAGE_KEY = "hrms_equipment_scope";
+const VIEW_ONLY_MESSAGE = "담당 장비가 아니라 조회만 할 수 있습니다.";
+
+function isSystemAdmin() {
+  return getSession()?.role === "시스템관리자";
+}
+
+function isMyEquipment(equipmentId) {
+  return isSystemAdmin() || state.myEquipmentIds.has(String(equipmentId));
+}
+
+function setViewOnlyNotice(elementId, viewOnly) {
+  const el = document.getElementById(elementId);
+  el.textContent = VIEW_ONLY_MESSAGE;
+  el.hidden = !viewOnly;
+}
+
+function readSavedScope() {
+  try {
+    return window.localStorage.getItem(EQUIPMENT_SCOPE_STORAGE_KEY) === "all" ? "all" : "mine";
+  } catch (err) {
+    return "mine";
+  }
+}
+
+function saveScope(scope) {
+  try {
+    window.localStorage.setItem(EQUIPMENT_SCOPE_STORAGE_KEY, scope);
+  } catch (err) {
+    // 저장 못 해도 이번 화면에서는 그대로 동작한다
+  }
+}
+
+// 지금 범위에서 목록에 보일 장비 — 필터 선택지(지역·시설동)도 이걸 기준으로 만든다
+function scopedEquipments() {
+  if (state.scope === "all" || isSystemAdmin()) return state.equipments;
+  return state.equipments.filter((e) => isMyEquipment(e.id));
+}
+
+function initScopeSwitch() {
+  const el = document.getElementById("eqScopeSwitch");
+  if (isSystemAdmin()) {
+    state.scope = "all";
+    el.hidden = true;
+    return;
+  }
+  state.scope = readSavedScope();
+  el.hidden = false;
+  renderScopeSwitch();
+  el.querySelectorAll(".eq-scope-opt").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      if (btn.dataset.scope === state.scope) return;
+      state.scope = btn.dataset.scope;
+      saveScope(state.scope);
+      renderScopeSwitch();
+      refreshEquipmentFilterOptions();
+      renderEquipmentListFromFirstPage();
+    });
+  });
+}
+
+function renderScopeSwitch() {
+  document.querySelectorAll("#eqScopeSwitch .eq-scope-opt").forEach((btn) => {
+    const active = btn.dataset.scope === state.scope;
+    btn.classList.toggle("active", active);
+    btn.setAttribute("aria-pressed", String(active));
+  });
+}
 
 // ---------- 초기화 ----------
 
@@ -46,6 +125,7 @@ async function initEquipmentPage() {
   // 지역/시설동 필터도 이 목록에서 파생되므로(초기화 아래쪽 참고), 이 한 번의 BUSY로
   // "장비 목록 + 지역/시설동" 모두를 함께 덮는다.
   await withGlobalBusy(loadEquipments);
+  initScopeSwitch();
   initEquipmentFilters();
   renderEquipmentList();
   await openChannelFromUrl();
@@ -53,7 +133,7 @@ async function initEquipmentPage() {
 
 // 이벤트 상세 창의 "경보 범위 설정 ↗" 링크로 들어온 경우(?equipment=&compressor=&channel=, 2026-10-22) —
 // 그 장비의 압축기 창을 열고 해당 압축기를 고른 뒤, 그 채널 줄을 강조하고 하한 칸에 커서를 둔다.
-// 목록(담당 장비)에 없는 장비면 고칠 권한이 없는 것이라 안내만 한다. 새로 고침해도 다시 열리지 않게 주소는 비운다.
+// 담당 장비가 아니면 고칠 권한이 없는 것이라 안내만 한다. 새로 고침해도 다시 열리지 않게 주소는 비운다.
 async function openChannelFromUrl() {
   const params = new URLSearchParams(window.location.search);
   const equipmentId = params.get("equipment");
@@ -62,7 +142,7 @@ async function openChannelFromUrl() {
   const channelNo = params.get("channel");
   window.history.replaceState(null, "", window.location.pathname);
 
-  if (!findEquipment(equipmentId)) {
+  if (!findEquipment(equipmentId) || !isMyEquipment(equipmentId)) {
     window.alert("이 장비의 경보 범위를 설정할 권한이 없거나 장비를 찾을 수 없습니다.");
     return;
   }
@@ -118,9 +198,15 @@ function wireEscapeKey() {
 
 async function loadEquipments() {
   try {
-    // 담당 장비만 — 수정 권한이 담당 기준이라 목록도 같은 기준으로 맞춘다(백엔드 2026-09-28).
-    // 시스템관리자는 mine=true여도 서버가 전체를 준다(담당 배정이 없는 게 보통이라).
-    state.equipments = await apiFetch("/api/equipments?mine=true");
+    // 목록은 전체 장비, 권한 판정은 담당 장비(mine=true) id로 한다(2026-11-19 고객사 요청 — 전체 조회).
+    // 시스템관리자는 전체 권한이라 담당 목록을 따로 받을 필요가 없다.
+    if (isSystemAdmin()) {
+      state.equipments = await apiFetch("/api/equipments");
+    } else {
+      const [all, mine] = await Promise.all([apiFetch("/api/equipments"), apiFetch("/api/equipments?mine=true")]);
+      state.equipments = all;
+      state.myEquipmentIds = new Set(mine.map((e) => String(e.id)));
+    }
   } catch (err) {
     document.getElementById("equipmentListBody").innerHTML =
       `<tr><td colspan="7"><div class="empty-state">불러오지 못했습니다. (${escapeHtml(err.message)})</div></td></tr>`;
@@ -195,12 +281,17 @@ function findEquipment(equipmentId) {
 //  등록됐고, "+ 신규 등록"이 두 번 실행돼 모달 열림 카운터가 어긋나면서 배경 스크롤이
 //  영영 안 풀리는 문제가 있었다.)
 function refreshEquipmentFilterOptions() {
+  // 범위 전환·저장 뒤에도 불리므로, 고른 값이 새 선택지에 남아 있으면 그대로 유지한다
   const regionSelect = document.getElementById("eqFilterRegion");
-  const availableRegions = collectRegions(state.equipments);
+  const currentRegion = regionSelect.value;
+  const availableRegions = collectRegions(scopedEquipments());
   regionSelect.innerHTML = `<option value="">전체</option>` + availableRegions.map((r) => `<option value="${escapeHtml(r)}">${escapeHtml(r)}</option>`).join("");
+  if (availableRegions.includes(currentRegion)) regionSelect.value = currentRegion;
 
   const statusSelect = document.getElementById("eqFilterStatus");
+  const currentStatus = statusSelect.value;
   statusSelect.innerHTML = `<option value="">전체</option>` + EQUIPMENT_STATUSES.map((s) => `<option value="${s}">${s}</option>`).join("");
+  if (EQUIPMENT_STATUSES.includes(currentStatus)) statusSelect.value = currentStatus;
 
   updateEquipmentBuildingFilter();
 }
@@ -220,13 +311,19 @@ function initEquipmentFilters() {
   document.getElementById("eqFilterBuilding").addEventListener("change", renderEquipmentListFromFirstPage);
   document.getElementById("eqFilterStatus").addEventListener("change", renderEquipmentListFromFirstPage);
   document.getElementById("eqFilterSearch").addEventListener("input", renderEquipmentListFromFirstPage);
-  document.getElementById("eqAddBtn").addEventListener("click", () => openEquipmentModal(null));
+  // 장비 등록(POST /api/equipments)은 시스템관리자 전용이라 버튼도 관리자에게만 보인다(2026-11-19).
+  // 아래 구분선은 신규 등록·검사이력 일괄등록(둘 다 관리자 전용) 위에 있는 것이라 같이 숨긴다.
+  const addBtn = document.getElementById("eqAddBtn");
+  addBtn.hidden = !isSystemAdmin();
+  document.getElementById("eqAdminDivider").hidden = !isSystemAdmin();
+  addBtn.addEventListener("click", () => openEquipmentModal(null));
 }
 
 function updateEquipmentBuildingFilter() {
   const region = document.getElementById("eqFilterRegion").value;
   const buildingSelect = document.getElementById("eqFilterBuilding");
-  const pool = region ? state.equipments.filter((e) => e.region === region) : state.equipments;
+  const scoped = scopedEquipments();
+  const pool = region ? scoped.filter((e) => e.region === region) : scoped;
   const buildings = [...new Set(pool.map((e) => e.buildingName))].sort((a, b) => a.localeCompare(b, "ko"));
   const current = buildingSelect.value;
   buildingSelect.innerHTML = `<option value="">전체</option>` + buildings.map((b) => `<option value="${escapeHtml(b)}">${escapeHtml(b)}</option>`).join("");
@@ -243,7 +340,8 @@ function renderEquipmentList() {
   const status = document.getElementById("eqFilterStatus").value;
   const search = document.getElementById("eqFilterSearch").value.trim().toLowerCase();
 
-  const rows = state.equipments
+  const scoped = scopedEquipments();
+  const rows = scoped
     .filter((e) => !region || e.region === region)
     .filter((e) => !buildingName || e.buildingName === buildingName)
     .filter((e) => !status || e.status === status)
@@ -260,7 +358,10 @@ function renderEquipmentList() {
   const tbody = document.getElementById("equipmentListBody");
   if (rows.length === 0) {
     // 담당 장비 자체가 없는 경우와 필터 결과가 없는 경우를 구분해서 알려준다
-    const message = state.equipments.length === 0 ? "담당 장비가 없습니다. 시스템관리자에게 담당 장비 등록을 요청하세요." : "조건에 맞는 장비가 없습니다.";
+    let message = "조건에 맞는 장비가 없습니다.";
+    if (scoped.length === 0) {
+      message = state.scope === "mine" && !isSystemAdmin() ? "담당 장비가 없습니다. 시스템관리자에게 담당 장비 등록을 요청하세요. (전체 장비는 조회할 수 있습니다)" : "등록된 장비가 없습니다.";
+    }
     tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state">${message}</div></td></tr>`;
     renderEquipmentPager(0);
     return;
@@ -268,6 +369,7 @@ function renderEquipmentList() {
 
   const { pageItems, page, start } = paginate(rows, state.page);
   state.page = page;
+  const showMineBadge = state.scope === "all" && !isSystemAdmin();
 
   tbody.innerHTML = pageItems
     .map((e, i) => {
@@ -275,11 +377,13 @@ function renderEquipmentList() {
       const compressorCount = e.registeredCompressorCount ?? 0;
       // 열 폭이 고정이라 긴 위치·장비명은 잘린다 — 잘린 내용을 마우스로 확인할 수 있게 통째로 단다
       const fullLabel = escapeHtml(`${formatLocation(e)} · ${e.name}`);
+      // 전체 장비를 볼 때 내 담당 장비에만 "담당" 표시 — 나머지는 조회만 된다
+      const mineBadge = showMineBadge && isMyEquipment(e.id) ? `<span class="eq-mine-badge">담당</span>` : "";
       return `
         <tr data-id="${e.id}">
           <td>${start + i + 1}</td>
           <td title="${fullLabel}">${escapeHtml(formatLocation(e))}</td>
-          <td title="${fullLabel}"><span class="row-link" data-id="${e.id}">${escapeHtml(e.name)}</span></td>
+          <td title="${fullLabel}">${mineBadge}<span class="row-link" data-id="${e.id}">${escapeHtml(e.name)}</span></td>
           <td>${escapeHtml(e.managementNumber ?? "-")}</td>
           <td>${statusBadge(e.status)}</td>
           <td><button type="button" class="eq-count-btn" data-kind="inspection" data-id="${e.id}">검사이력</button></td>
@@ -329,6 +433,7 @@ function renderEquipmentListFromFirstPage() {
 const equipmentModalState = {
   id: null,
   isNew: true,
+  editable: true, // 담당 장비(또는 신규 등록)일 때만 true — 아니면 이력카드·세부설정을 조회만 한다
   rangeSettings: defaultRangeSettings(),
   runningCurrentThresholdDecimalPlaces: null, // GET 응답 전용 필드 — 1번 압축기 CH07의 decimalPlaces
   photos: { equipment: null, installation: null }, // 슬롯별 { id, objectUrl } | "loading" | null
@@ -389,6 +494,7 @@ function openEquipmentModal(equipmentId) {
   const equipment = equipmentId ? findEquipment(equipmentId) : null;
   equipmentModalState.id = equipment ? equipment.id : null;
   equipmentModalState.isNew = !equipment;
+  equipmentModalState.editable = !equipment || isMyEquipment(equipment.id);
   equipmentModalState.rangeSettings = equipment ? extractRangeSettings(equipment) : defaultRangeSettings();
   // 신규 등록은 아직 압축기·채널 설정이 없어 서버가 알려줄 자리수도 없다 — 서버가 새 압축기
   // CH07에 넣을 기본값(전류 1자리)을 그대로 가정해야 raw 변환이 어긋나지 않는다.
@@ -401,10 +507,21 @@ function openEquipmentModal(equipmentId) {
   if (!equipment) resetNewCompressorRows();
   hideFormError();
   fillEquipmentForm(equipment);
+  applyEquipmentModalEditable(equipmentModalState.editable);
   resetPhotoSlots(equipment ? equipment.id : null);
   equipmentModalDirty.capture();
 
   openModalOverlay("equipmentModal");
+}
+
+// 담당이 아닌 장비는 이력카드 입력칸을 전부 막고 저장 버튼을 숨긴다(사진 버튼은 renderPhotoSlot).
+// "세부설정"(냉각수·브라인·전압) 버튼은 남겨서 값을 볼 수 있게 한다 — 그 창도 조회 전용으로 열린다.
+function applyEquipmentModalEditable(editable) {
+  document.querySelectorAll("#equipmentModal .modal-body input, #equipmentModal .modal-body select, #equipmentModal .modal-body textarea").forEach((el) => {
+    el.disabled = !editable;
+  });
+  document.getElementById("equipmentSaveBtn").hidden = !editable;
+  setViewOnlyNotice("equipmentViewOnlyNotice", !editable);
 }
 
 // ---------- 신규 등록 시 압축기 IP/MAC 입력 리스트 ----------
@@ -481,13 +598,15 @@ function renderPhotoSlot(slot) {
     return;
   }
 
-  uploadLabel.hidden = false;
+  // 담당이 아닌 장비는 사진을 보기만 한다(올리기·삭제 버튼 숨김 — 서버도 403)
+  const editable = equipmentModalState.editable;
+  uploadLabel.hidden = !editable;
   if (photo === "loading") {
     body.innerHTML = `<div class="empty-state">불러오는 중...</div>`;
     deleteBtn.hidden = true;
   } else if (photo) {
     body.innerHTML = `<img class="eq-photo-preview-img" src="${photo.objectUrl}" alt="${escapeHtml(cfg.label)}" />`;
-    deleteBtn.hidden = false;
+    deleteBtn.hidden = !editable;
   } else {
     body.innerHTML = `<div class="empty-state">등록된 사진이 없습니다.</div>`;
     deleteBtn.hidden = true;
@@ -700,6 +819,7 @@ function equipmentSaveErrorMessage(err) {
 }
 
 async function saveEquipment() {
+  if (!equipmentModalState.editable) return;
   const buildingName = getValue("fBuildingName").trim();
   const name = getValue("fName").trim();
 
@@ -888,6 +1008,14 @@ function openRangeModal() {
   setValue("rVoltageMax", formatDecimalOrEmpty(r.voltageMax, DECIMAL_PLACES_BY_UNIT.voltage));
 
   updateRangeFieldsEnabled();
+  // 담당이 아닌 장비는 조회만 — 입력칸을 막고 저장 버튼을 숨긴다(이력카드와 같은 기준)
+  const editable = equipmentModalState.editable;
+  document.querySelectorAll("#rangeSettingsModal .modal-body input").forEach((el) => {
+    el.disabled = !editable;
+  });
+  document.getElementById("rangeSettingsSaveBtn").hidden = !editable;
+  document.getElementById("rangeSettingsCancelBtn").textContent = editable ? "취소" : "닫기";
+  setViewOnlyNotice("rangeViewOnlyNotice", !editable);
   document.getElementById("rangeSettingsError").hidden = true;
   rangeModalDirty.capture();
   openModalOverlay("rangeSettingsModal");
@@ -924,6 +1052,7 @@ function collectRangeFormValues() {
 }
 
 async function saveRangeSettings() {
+  if (!equipmentModalState.editable) return;
   if (!window.confirm("저장하시겠습니까?")) return;
 
   const newRangeSettings = collectRangeFormValues();
@@ -961,6 +1090,7 @@ const compressorPopupState = {
   compressors: [],
   selectedId: null,
   detailSnapshot: null, // 현재 선택된 압축기를 불러온 직후의 상태(JSON 문자열) — 변경 여부 판정용
+  editable: true, // 담당 장비일 때만 true — 아니면 압축기·채널 설정을 조회만 한다
 };
 
 function wireCompressorPopup() {
@@ -977,7 +1107,10 @@ async function openCompressorPopup(equipmentId) {
   compressorPopupState.equipmentId = equipmentId;
   compressorPopupState.selectedId = null;
   compressorPopupState.detailSnapshot = null;
+  compressorPopupState.editable = isMyEquipment(equipmentId);
   document.getElementById("cmpPopupError").hidden = true;
+  document.getElementById("cmpSaveBtn").hidden = !compressorPopupState.editable;
+  setViewOnlyNotice("cmpViewOnlyNotice", !compressorPopupState.editable);
 
   const equipment = findEquipment(equipmentId);
   document.getElementById("cmpPopupEquipmentSubtitle").textContent = equipment ? formatLocation(equipment) + " · " + equipment.name : "";
@@ -1064,8 +1197,13 @@ async function openCompressorDetail(compressorId) {
   setValue("cmSeq", compressor.sequenceNo);
   setValue("cmIp", compressor.ipAddress);
   setValue("cmMac", compressor.macAddress);
-  // IP·MAC은 시스템관리자 전용 — 담당자에게는 읽기 전용으로 보인다(서버도 바꾸면 403)
-  ["cmIp", "cmMac"].forEach((id) => setCommSettingReadOnly(document.getElementById(id)));
+  // IP·MAC은 시스템관리자 전용 — 담당자에게는 읽기 전용으로 보인다(서버도 바꾸면 403).
+  // 담당이 아닌 장비는 칸 자체를 막는다(다른 장비를 열 때 풀리도록 매번 다시 정한다).
+  ["cmIp", "cmMac"].forEach((id) => {
+    const input = document.getElementById(id);
+    input.disabled = !compressorPopupState.editable;
+    setCommSettingReadOnly(input);
+  });
 
   // 압축기를 바꿀 때마다 표를 "불러오는 중" 한 줄로 통째로 비웠다가 새로 채우면, 표
   // 높이가 7행 → 1행 → 7행으로 출렁여서 화면이 깜빡이는 것처럼 보인다(캐시가 없어
@@ -1080,6 +1218,12 @@ async function openCompressorDetail(compressorId) {
   try {
     const settings = await getChannelSettings(compressorId);
     renderChannelSettingsTable(settings);
+    // 담당이 아닌 장비는 채널 설정 표 전체(토글·선택·입력)를 막는다 — 표는 압축기를 고를 때마다 새로 그려진다
+    if (!compressorPopupState.editable) {
+      tbody.querySelectorAll("input, select, button").forEach((el) => {
+        el.disabled = true;
+      });
+    }
     tbody.classList.remove("eq-channel-loading");
   } catch (err) {
     tbody.classList.remove("eq-channel-loading");
@@ -1129,7 +1273,7 @@ function validateChannelLimits(channelSettings) {
 // 처리 중 표시는 공통 BUSY UI(common/js/ui.js의 withGlobalBusy — 화면 전체를 덮는
 // 오버레이+스핀 컨트롤)에 맡긴다 — 실패하면 팝업은 그대로 열려 있어 다시 시도할 수 있다.
 async function saveCurrentCompressorDetail() {
-  if (!compressorPopupState.selectedId) return;
+  if (!compressorPopupState.selectedId || !compressorPopupState.editable) return;
 
   const payload = collectCompressorDetailPayload();
   document.getElementById("cmpPopupError").hidden = true;
@@ -1392,8 +1536,8 @@ function showCompressorPopupError(message) {
 // 검사이력 팝업 (좌: 목록 / 우: 상세, 항상 둘 다 표시 — 압축기 구성 팝업과 같은 구조)
 //
 // 기존 InspectionReport(점검일지, 주간 O/X 체크리스트+결재)와는 무관한 별개 기능이다.
-// 결재 없음, 담당 장비 제약 없음(로그인한 누구나 조회/작성/편집 가능) — 단 삭제만
-// 시스템관리자로 제한(사용자 결정, 백엔드 반영 완료). 첨부파일은 슬롯 없는 다건
+// 결재 없음. 서버는 담당 장비 제약 없이 로그인한 누구나 작성할 수 있게 두지만(편집은 작성자, 삭제는
+// 시스템관리자), 화면에서는 담당 장비만 작성·수정·첨부할 수 있게 막는다(2026-11-19 고객사 요청). 첨부파일은 슬롯 없는 다건
 // 첨부(ownerType=EquipmentInspectionHistory) — 파일마다 별도 업로드 호출.
 // ========================================================================
 
@@ -1405,6 +1549,7 @@ const inspectionPopupState = {
   attachments: [],
   pendingFiles: [], // 신규작성 중(id 없음) 선택한 파일 — 저장 성공 후 한꺼번에 업로드
   canEditSelected: false, // 선택한 이력의 수정 권한(서버가 준 canEdit) — 첨부 추가/삭제 가능 여부와 동일하게 본다
+  editable: true, // 담당 장비일 때만 true — 아니면 신규작성·수정·삭제·첨부를 막는다(서버는 막지 않아 화면에서만)
 };
 
 // 압축기 팝업과 같은 공용 dirty-tracker 패턴 — 폼 값(날짜/제목/검사내용/비고)만 대상으로
@@ -1433,7 +1578,7 @@ function wireInspectionPopup() {
 }
 
 function canDeleteInspection() {
-  return getSession()?.role === "시스템관리자";
+  return inspectionPopupState.editable && isSystemAdmin();
 }
 
 async function openInspectionPopup(equipmentId) {
@@ -1442,7 +1587,14 @@ async function openInspectionPopup(equipmentId) {
   inspectionPopupState.isNew = false;
   inspectionPopupState.items = []; // 남겨두면 조회 실패 시 직전 장비 이력이 그대로 보이고 수정까지 된다
   inspectionPopupState.attachments = [];
+  inspectionPopupState.editable = isMyEquipment(equipmentId);
   document.getElementById("ihPopupError").hidden = true;
+  document.getElementById("ihAddNewBtn").hidden = !inspectionPopupState.editable;
+  document.getElementById("ihSaveBtn").hidden = !inspectionPopupState.editable;
+  document.getElementById("ihDetailEmpty").textContent = inspectionPopupState.editable
+    ? `등록된 검사 이력이 없습니다. "+ 신규작성"으로 추가하세요.`
+    : "등록된 검사 이력이 없습니다.";
+  setViewOnlyNotice("ihViewOnlyNotice", !inspectionPopupState.editable);
 
   const equipment = findEquipment(equipmentId);
   document.getElementById("ihPopupEquipmentSubtitle").textContent = equipment ? formatLocation(equipment) + " · " + equipment.name : "";
@@ -1533,7 +1685,7 @@ async function openInspectionDetail(itemId) {
   setValue("ihNotes", item.notes);
   document.getElementById("ihAuditInfo").textContent = formatInspectionAuditInfo(item);
 
-  inspectionPopupState.canEditSelected = canEditInspection(item);
+  inspectionPopupState.canEditSelected = inspectionPopupState.editable && canEditInspection(item);
   applyInspectionNewMode(false);
   setInspectionFormEditable(inspectionPopupState.canEditSelected);
   await loadInspectionAttachments(itemId);
@@ -1553,10 +1705,12 @@ function setInspectionFormEditable(editable) {
     document.getElementById(id).disabled = !editable;
   });
   document.getElementById("ihSaveBtn").hidden = !editable;
-  document.getElementById("ihReadonlyNotice").hidden = editable;
+  // 담당이 아닌 장비면 위쪽 "조회만 할 수 있습니다" 안내가 이미 이유를 말해 주므로 작성자 안내는 숨긴다
+  document.getElementById("ihReadonlyNotice").hidden = editable || !inspectionPopupState.editable;
 }
 
 function startInspectionNewDraft() {
+  if (!inspectionPopupState.editable) return;
   if (!confirmDiscardIfDirty(inspectionDirty)) return;
 
   inspectionPopupState.selectedId = null;
@@ -1841,6 +1995,7 @@ const repairPopupState = {
   selectedId: null,
   isNew: false,
   current: null,
+  editable: true, // 담당 장비일 때만 true — 아니면 신규작성·수정·삭제·결재를 막는다(등록·수정은 서버가 막지 않아 화면에서만)
 };
 
 const repairDirty = createDirtyTracker(collectRepairFormValues);
@@ -1860,6 +2015,12 @@ async function openRepairPopup(equipmentId) {
   repairPopupState.isNew = false;
   repairPopupState.current = null;
   repairPopupState.items = []; // 검사이력과 같은 이유 — 조회 실패 시 직전 장비 일지가 남으면 안 된다
+  repairPopupState.editable = isMyEquipment(equipmentId);
+  document.getElementById("rlAddNewBtn").hidden = !repairPopupState.editable;
+  document.getElementById("rlDetailEmpty").textContent = repairPopupState.editable
+    ? `등록된 수리보수 및 철거일지가 없습니다. "+ 신규작성"으로 추가하세요.`
+    : "등록된 수리보수 및 철거일지가 없습니다.";
+  setViewOnlyNotice("rlViewOnlyNotice", !repairPopupState.editable);
 
   const equipment = findEquipment(equipmentId);
   document.getElementById("rlPopupEquipmentSubtitle").textContent = equipment ? formatLocation(equipment) + " · " + equipment.name : "";
@@ -1970,6 +2131,7 @@ function openRepairDetail(itemId) {
 }
 
 function startRepairNewDraft() {
+  if (!repairPopupState.editable) return;
   if (!confirmDiscardIfDirty(repairDirty)) return;
 
   repairPopupState.selectedId = null;
@@ -2021,14 +2183,16 @@ function setRepairFormEditable(editable) {
 
 // 수정/삭제 가능 여부는 서버가 계산해 준 canEdit/canDelete를 그대로 따른다.
 // 못 고치는 이유는 둘 중 하나라 안내 문구를 구분한다: 결재가 시작됐거나(409), 남의 글이거나(403).
+// 담당이 아닌 장비는 서버 판정과 상관없이 전부 막는다 — 이유는 위쪽 "조회만" 안내가 말해 주므로 아래 안내는 숨긴다.
 function applyRepairPermissions(item) {
-  const canEdit = item.canEdit !== false;
+  const editable = repairPopupState.editable;
+  const canEdit = editable && item.canEdit !== false;
   setRepairFormEditable(canEdit);
   document.getElementById("rlSaveBtn").hidden = !canEdit;
-  document.getElementById("rlDeleteBtn").hidden = item.canDelete !== true;
+  document.getElementById("rlDeleteBtn").hidden = !(editable && item.canDelete === true);
 
   const notice = document.getElementById("rlLockNotice");
-  notice.hidden = canEdit;
+  notice.hidden = canEdit || !editable;
   notice.textContent = isApprovalStarted(item)
     ? "결재가 진행된 문서는 수정할 수 없습니다. 시스템관리자가 결재를 리셋하면 다시 수정할 수 있습니다."
     : "작성자 본인 또는 시스템관리자만 수정할 수 있습니다.";
@@ -2164,7 +2328,8 @@ const REPAIR_EMPTY_APPROVAL = {
 
 function renderRepairApprovalBar() {
   renderApprovalBar(document.getElementById("rlApprovalBar"), repairPopupState.current, {
-    allowApprove: repairPopupState.current !== null,
+    // 결재도 담당 장비만(서버도 담당이 아니면 403) — 담당이 아니면 결재 버튼을 아예 띄우지 않는다
+    allowApprove: repairPopupState.current !== null && repairPopupState.editable,
     emptyDoc: REPAIR_EMPTY_APPROVAL,
     onApprove: approveRepairLevel,
     onCancel: cancelRepairLevel,

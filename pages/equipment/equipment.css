@@ -33,6 +33,70 @@ body.eq-modal-open {
   margin: 4px 0;
 }
 
+/* ---------- 조회 범위 전환(내 장비 / 전체 장비, 2026-11-19) — 운전일지 가동/미가동 전환과 같은 모양 ---------- */
+
+.eq-scope-switch {
+  display: flex;
+  padding: 3px;
+  border-radius: 999px;
+  background: #f2f4f7;
+  box-shadow: inset 0 0 0 1px var(--color-border);
+}
+
+/* display: flex가 hidden 속성을 덮어쓰므로 명시한다(시스템관리자에게는 숨김) */
+.eq-scope-switch[hidden] {
+  display: none;
+}
+
+.eq-scope-opt {
+  flex: 1;
+  border: none;
+  background: transparent;
+  border-radius: 999px;
+  padding: 6px 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.eq-scope-opt:hover:not(.active) {
+  color: var(--color-text);
+}
+
+.eq-scope-opt.active {
+  background: var(--color-surface);
+  color: var(--color-primary);
+  box-shadow: var(--shadow-pop);
+  cursor: default;
+}
+
+/* 전체 장비를 볼 때 내 담당 장비 표시 */
+.eq-mine-badge {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 16px;
+  vertical-align: 1px;
+}
+
+/* 담당이 아닌 장비의 창(이력카드·세부설정·센서 설정·검사이력·수리일지) 위쪽 안내 */
+.eq-viewonly-notice {
+  background: #f2f4f7;
+  color: var(--color-text-muted);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  margin-bottom: 14px;
+}
+
 /* ---------- 장비 목록 ---------- */
 
 /* table-layout: fixed + colgroup — 이게 없으면 브라우저가 그 페이지에 실제로 그려진
