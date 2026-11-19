@@ -133,29 +133,16 @@ async function initOperationPage() {
   document.getElementById("nextMonthBtn").addEventListener("click", () => changeMonth(1));
   renderEmptyCalendar();
 
-  let myEquipments;
   try {
-    // 담당 장비만 — 저장 권한이 담당 기준이라 목록도 같은 기준으로 맞춘다(백엔드 2026-09-28).
-    // 시스템관리자는 mine=true여도 서버가 전체를 준다.
-    myEquipments = await apiFetch("/api/equipments?mine=true");
+    // 전체 장비 + 담당 장비 id(2026-11-19 — 전체 장비의 일지를 조회할 수 있다. 작성·결재·미가동 전환은 담당 장비만)
+    await loadEquipmentScope();
   } catch (err) {
     setPageNotice(`장비 목록을 불러오지 못했습니다. (${err.message})`);
     return;
   }
-  // 운전일지는 장비 상태가 '운영'인 장비에만 생긴다(api-manual 16번, 2026-11-06) — 나머지 장비는
-  // 매일 빈 폼만 나와서 선택 목록에서 뺀다(사용자 결정 2026-11-06).
-  state.equipments = myEquipments.filter((e) => e.status === "운영");
 
-  // 고를 장비가 하나도 없으면 선택 자체가 불가능하다 — 화면이 고장 난 것으로 오해하지 않게 알려준다
-  if (state.equipments.length === 0) {
-    setPageNotice(
-      myEquipments.length === 0
-        ? "담당 장비가 없습니다. 시스템관리자에게 담당 장비 등록을 요청하세요."
-        : "운영 중인 담당 장비가 없습니다. 운전일지는 장비 상태가 '운영'인 장비만 작성합니다."
-    );
-  }
-
-  populateRegionSelect();
+  initScopeSwitch("hrms_operation_scope", applyEquipmentScope);
+  applyEquipmentScope();
 
   document.getElementById("regionSelect").addEventListener("change", onRegionChange);
   document.getElementById("buildingSelect").addEventListener("change", onBuildingChange);
@@ -190,6 +177,35 @@ function populateYearMonthSelects() {
 
   state.year = thisYear;
   state.month = now.getMonth() + 1;
+}
+
+// ---------- 조회 범위(내 장비 / 전체 장비) ----------
+
+// 범위가 바뀌면 고를 수 있는 장비가 달라지므로 선택을 처음부터 다시 한다(캘린더는 빈 상태로).
+// 운전일지는 장비 상태가 '운영'인 장비에만 생긴다(api-manual 16번, 2026-11-06) — 나머지 장비는
+// 매일 빈 폼만 나와서 선택 목록에서 뺀다(사용자 결정 2026-11-06). 전체 장비를 볼 때도 같다.
+function applyEquipmentScope() {
+  const pool = scopedEquipments();
+  state.equipments = pool.filter((e) => e.status === "운영");
+  pageNotice = "";
+  if (state.equipments.length === 0) {
+    // 고를 장비가 하나도 없으면 화면이 고장 난 것으로 오해하지 않게 알려준다
+    if (equipmentScope.scope === "mine" && !isSystemAdminSession()) {
+      pageNotice =
+        pool.length === 0
+          ? "담당 장비가 없습니다. 시스템관리자에게 담당 장비 등록을 요청하세요. (전체 장비에서 다른 장비의 일지를 볼 수 있습니다)"
+          : "운영 중인 담당 장비가 없습니다. 운전일지는 장비 상태가 '운영'인 장비만 작성합니다.";
+    } else {
+      pageNotice = "운영 중인 장비가 없습니다. 운전일지는 장비 상태가 '운영'인 장비만 작성합니다.";
+    }
+  }
+  populateRegionSelect();
+  resetSelect(document.getElementById("buildingSelect"), "선택");
+  resetSelect(document.getElementById("equipmentSelect"), "선택");
+  state.equipmentId = null;
+  calendarNotice = "";
+  renderEmptyCalendar();
+  renderSelectionSummary();
 }
 
 // ---------- 지역 → 시설동 → 설비 계층 선택 (점검일지와 동일 패턴) ----------
@@ -248,7 +264,7 @@ function onBuildingChange() {
     .filter((e) => e.region === region && e.buildingName === buildingName)
     .sort((a, b) => a.name.localeCompare(b.name, "ko"));
   equipmentSelect.innerHTML =
-    `<option value="">선택</option>` + equipments.map((e) => `<option value="${e.id}">${escapeHtml(e.name)}</option>`).join("");
+    `<option value="">선택</option>` + equipments.map((e) => `<option value="${e.id}">${escapeHtml(equipmentOptionLabel(e))}</option>`).join("");
   equipmentSelect.disabled = false;
   renderSelectionSummary();
 }
@@ -447,8 +463,14 @@ function isAnyApproved() {
 
 // 결재가 하나라도 진행되면 읽기 전용 — 점검일지와 같은 규칙(사용자 결정 2026-09-28).
 // 2026-11-06부터 백엔드도 이 경우 저장을 409로 막는다(api-manual 18번). 미가동 전환(20-1번)만 예외.
+// 담당이 아닌 장비의 일지도 읽기 전용이다(조회만, 2026-11-19).
 function isDocLocked() {
-  return isApprovalStarted(modalState);
+  return isApprovalStarted(modalState) || isViewOnlyDoc();
+}
+
+// 지금 연 문서가 담당이 아닌 장비 것인지 — 작성·저장·결재·취소·미가동 전환을 모두 막는다(서버도 담당이 아니면 403)
+function isViewOnlyDoc() {
+  return modalState.equipmentId !== null && !isMyEquipment(modalState.equipmentId);
 }
 
 // ---------- 기록 시각 판정 (브라우저 = 한국 시간 기준) ----------
@@ -712,7 +734,13 @@ function renderModalBody() {
     </div>
 
     ${modalState.isIdle ? `<div class="op-idle-note">미가동일로 지정된 일지입니다. 미가동일은 결재 대상이 아닙니다.</div>` : ""}
-    ${locked ? `<div class="op-approved-note">${fullyApproved ? "결재가 완료된" : "결재가 진행된"} 문서라 읽기 전용입니다. 다시 수정하려면 시스템관리자의 결재 리셋이 필요합니다.</div>` : ""}
+    ${
+      isViewOnlyDoc()
+        ? `<div class="op-approved-note">${JOURNAL_VIEW_ONLY_MESSAGE}</div>`
+        : locked
+          ? `<div class="op-approved-note">${fullyApproved ? "결재가 완료된" : "결재가 진행된"} 문서라 읽기 전용입니다. 다시 수정하려면 시스템관리자의 결재 리셋이 필요합니다.</div>`
+          : ""
+    }
     <div class="op-error" id="opError" hidden></div>
 
     <div class="approval-bar" id="approvalBar"></div>
@@ -792,14 +820,17 @@ function showOpError(err) {
 
 // 문서 머리 우측의 [가동 | 미가동] 전환 버튼. 결재가 진행·완료된 문서나 지난 날짜에도 바꿀 수 있다(사양).
 // 로그가 없는 날짜(id 없음 — 서버가 하루 종일 꺼져 있던 날)는 서버가 받지 않으므로 비활성.
+// 담당이 아닌 장비는 상태만 보이고 누를 수 없다(2026-11-19 — 서버도 담당이 아니면 403).
 function renderIdleSwitchHtml() {
   const noLog = modalState.id === null;
+  const viewOnly = isViewOnlyDoc();
+  const disabled = noLog || viewOnly;
   const idle = modalState.isIdle;
-  const title = noLog ? "기록이 없는 날짜는 바꿀 수 없습니다" : "누르면 바로 저장됩니다";
+  const title = viewOnly ? "담당 장비만 바꿀 수 있습니다" : noLog ? "기록이 없는 날짜는 바꿀 수 없습니다" : "누르면 바로 저장됩니다";
   return `
     <div class="op-idle-switch${idle ? " is-idle" : ""}" role="group" aria-label="가동 상태" title="${title}">
-      <button type="button" class="op-idle-opt${idle ? "" : " active"}" data-idle="false" aria-pressed="${!idle}"${noLog ? " disabled" : ""}>가동</button>
-      <button type="button" class="op-idle-opt${idle ? " active" : ""}" data-idle="true" aria-pressed="${idle}"${noLog ? " disabled" : ""}>미가동</button>
+      <button type="button" class="op-idle-opt${idle ? "" : " active"}" data-idle="false" aria-pressed="${!idle}"${disabled ? " disabled" : ""}>가동</button>
+      <button type="button" class="op-idle-opt${idle ? " active" : ""}" data-idle="true" aria-pressed="${idle}"${disabled ? " disabled" : ""}>미가동</button>
     </div>
   `;
 }
@@ -807,7 +838,7 @@ function renderIdleSwitchHtml() {
 // 미가동 전환은 저장 버튼과 별개로 바로 저장된다. 응답으로 표 값까지 덮어쓰면 저장 안 한 입력이
 // 사라지므로, 미가동 여부와 결재 상태만 받아와 다시 그린다(입력 중인 값과 변경 여부는 그대로 유지).
 async function setOperationIdle(isIdle) {
-  if (modalState.id === null || modalState.isIdle === isIdle) return;
+  if (modalState.id === null || modalState.isIdle === isIdle || isViewOnlyDoc()) return;
   if (isIdle && !window.confirm("미가동 전환 하시겠습니까?\n미가동 상태에서는 결재가 불가능합니다.")) return;
   document.querySelectorAll(".op-idle-opt").forEach((btn) => (btn.disabled = true));
   try {
@@ -831,7 +862,8 @@ async function setOperationIdle(isIdle) {
 
 function renderOperationApprovalBar() {
   renderApprovalBar(document.getElementById("approvalBar"), modalState, {
-    allowApprove: modalState.id !== null, // 저장 전 문서는 결재할 수 없다
+    allowApprove: modalState.id !== null && !isViewOnlyDoc(), // 저장 전 문서·담당이 아닌 장비는 결재할 수 없다
+    allowCancel: !isViewOnlyDoc(),
     approveBlockedReason: operationApproveBlockReason(), // 미가동·21시 전이면 버튼 비활성 + 사유 툴팁
     onApprove: approveLevel,
     onCancel: cancelApproval,
@@ -1225,6 +1257,7 @@ async function mergeSlotsRecordedMeanwhile(items) {
 
 // 결재 전 자동 저장에서도 부르므로 성공하면 true를 돌려준다(approval.js confirmBeforeApprove).
 async function saveOperationLog({ askConfirm = true, closeAfter = true } = {}) {
+  if (isViewOnlyDoc()) return false; // 담당이 아닌 장비는 조회만(저장 버튼도 없다)
   if (askConfirm && !window.confirm("저장하시겠습니까?")) return false;
 
   const items = modalState.items.map((it) => ({

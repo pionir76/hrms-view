@@ -75,7 +75,8 @@ const APPROVAL_EMPTY_DOC = {
 };
 
 function renderApprovalBar(el, doc, options = {}) {
-  const { allowApprove = true, approveBlockedReason = null, onApprove, onCancel, emptyDoc = APPROVAL_EMPTY_DOC } = options;
+  // allowCancel: false면 "취소" 버튼도 숨긴다 — 담당이 아닌 장비의 일지를 조회만 할 때(점검일지·운전일지, 2026-11-19)
+  const { allowApprove = true, allowCancel = true, approveBlockedReason = null, onApprove, onCancel, emptyDoc = APPROVAL_EMPTY_DOC } = options;
   const session = getSession();
   const target = doc ?? emptyDoc;
 
@@ -93,7 +94,7 @@ function renderApprovalBar(el, doc, options = {}) {
       // 로그인 세션에는 성명이 없어 "내가 승인한 것인지"를 프론트가 확정할 수 없으므로,
       // 역할이 같으면 일단 버튼을 보여주고 실제 판정은 서버 403에 맡긴다.
       const higherApproved = APPROVAL_LEVEL_KEYS.slice(idx + 1).some((k) => target[k].status === "Approved");
-      const canCancel = !higherApproved && session && session.role === roleLabel;
+      const canCancel = allowCancel && !higherApproved && session && session.role === roleLabel;
       inner = `
         <div class="approval-approved">
           ${canCancel ? `<button type="button" class="approval-cancel-btn" data-level="${key}">취소</button>` : ""}

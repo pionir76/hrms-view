@@ -4,7 +4,7 @@ const DAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 const DAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 
 const state = {
-  equipments: [], // GET /api/equipments 원본 전체
+  equipments: [], // 지금 조회 범위(내 장비 / 전체 장비)에서 고를 수 있는 장비 — common/js/equipment-scope.js
   equipmentId: null,
   equipmentName: "",
   managementNumber: "", // 장비명 옆에 붙이는 관리번호
@@ -42,20 +42,15 @@ async function initInspectionPage() {
   renderEmptyCalendar();
 
   try {
-    // 담당 장비만 — 저장 권한이 담당 기준이라 목록도 같은 기준으로 맞춘다(백엔드 2026-09-28).
-    // 시스템관리자는 mine=true여도 서버가 전체를 준다.
-    state.equipments = await apiFetch("/api/equipments?mine=true");
+    // 전체 장비 + 담당 장비 id(2026-11-19 — 전체 장비의 일지를 조회할 수 있다. 작성·결재는 담당 장비만)
+    await loadEquipmentScope();
   } catch (err) {
     setPageNotice(`장비 목록을 불러오지 못했습니다. (${err.message})`);
     return;
   }
 
-  // 담당 장비가 하나도 없으면 선택 자체가 불가능하다 — 화면이 고장 난 것으로 오해하지 않게 알려준다
-  if (state.equipments.length === 0) {
-    setPageNotice("담당 장비가 없습니다. 시스템관리자에게 담당 장비 등록을 요청하세요.");
-  }
-
-  populateRegionSelect();
+  initScopeSwitch("hrms_inspection_scope", applyEquipmentScope);
+  applyEquipmentScope();
 
   document.getElementById("regionSelect").addEventListener("change", onRegionChange);
   document.getElementById("buildingSelect").addEventListener("change", onBuildingChange);
@@ -86,6 +81,29 @@ function populateYearMonthSelects() {
 
   state.year = thisYear;
   state.month = now.getMonth() + 1;
+}
+
+// ---------- 조회 범위(내 장비 / 전체 장비) ----------
+
+// 범위가 바뀌면 고를 수 있는 장비가 달라지므로 선택을 처음부터 다시 한다(캘린더는 빈 상태로).
+function applyEquipmentScope() {
+  state.equipments = scopedEquipments();
+  pageNotice = "";
+  if (state.equipments.length === 0) {
+    // 고를 장비가 하나도 없으면 화면이 고장 난 것으로 오해하지 않게 알려준다
+    pageNotice =
+      equipmentScope.scope === "mine" && !isSystemAdminSession()
+        ? "담당 장비가 없습니다. 시스템관리자에게 담당 장비 등록을 요청하세요. (전체 장비에서 다른 장비의 일지를 볼 수 있습니다)"
+        : "등록된 장비가 없습니다.";
+  }
+  populateRegionSelect();
+  resetSelect(document.getElementById("buildingSelect"), "선택");
+  resetSelect(document.getElementById("equipmentSelect"), "선택");
+  state.equipmentId = null;
+  calendarNotice = "";
+  renderEquipmentStatus(null);
+  renderEmptyCalendar();
+  renderSelectionSummary();
 }
 
 // ---------- 지역 → 시설동 → 설비 계층 선택 ----------
@@ -147,7 +165,7 @@ function onBuildingChange() {
     .filter((e) => e.region === region && e.buildingName === buildingName)
     .sort((a, b) => a.name.localeCompare(b.name, "ko"));
   equipmentSelect.innerHTML =
-    `<option value="">선택</option>` + equipments.map((e) => `<option value="${e.id}">${escapeHtml(e.name)}</option>`).join("");
+    `<option value="">선택</option>` + equipments.map((e) => `<option value="${e.id}">${escapeHtml(equipmentOptionLabel(e))}</option>`).join("");
   equipmentSelect.disabled = false;
   renderSelectionSummary();
 }
@@ -348,8 +366,14 @@ const inspectionDirty = createDirtyTracker(() => ({
   results: modalState.results,
 }));
 
+// 입력을 막는 경우: 결재가 진행됐거나, 담당이 아닌 장비(조회만, 2026-11-19)
 function isDocLocked(log) {
-  return isApprovalStarted(log);
+  return isApprovalStarted(log) || isViewOnlyDoc();
+}
+
+// 지금 연 문서가 담당이 아닌 장비 것인지 — 작성·저장·결재·취소를 모두 막는다(서버도 담당이 아니면 403)
+function isViewOnlyDoc() {
+  return modalState.equipmentId !== null && !isMyEquipment(modalState.equipmentId);
 }
 
 // 미상신 / 책임자 결재 대기 / 총괄자결재대기 / 완료 — level1이 아직이면 저장 여부와 무관하게 "미상신"으로 합친다.
@@ -426,6 +450,7 @@ function renderEmptyCalendar() {
 function renderCalendarTable(weeks, logs, month) {
   const today = todayDateString();
   const hasData = logs !== null;
+  const writeLabel = state.equipmentId && !isMyEquipment(state.equipmentId) ? "보기" : "작성";
   const rows = weeks
     .map((week, i) => {
       const weekStart = toDateStr(week[0]);
@@ -440,7 +465,8 @@ function renderCalendarTable(weeks, logs, month) {
           const dateStr = toDateStr(d);
           const isToday = dateStr === today;
           const cls = [dow === 0 ? "cal-sun" : dow === 6 ? "cal-sat" : "", isToday ? "cal-today" : ""].filter(Boolean).join(" ");
-          const writeBtn = !hasData || dateStr > today ? "" : `<button type="button" class="cal-write-btn" data-week-start="${weekStart}">작성</button>`;
+          // 담당이 아닌 장비는 조회만 되므로 "보기"(2026-11-19)
+          const writeBtn = !hasData || dateStr > today ? "" : `<button type="button" class="cal-write-btn" data-week-start="${weekStart}">${writeLabel}</button>`;
           return `
             <td class="${cls}">
               <div class="cal-date"><span class="cal-date-num">${d.getDate()}</span></div>
@@ -586,7 +612,13 @@ function renderModalBody() {
     </div>
 
     <div class="inspection-error" id="inspectionError" hidden></div>
-    ${locked ? `<div class="inspection-locked-note">결재가 진행되어 이 점검표는 읽기 전용입니다. 다시 수정하려면 시스템관리자의 결재 리셋이 필요합니다.</div>` : ""}
+    ${
+      isViewOnlyDoc()
+        ? `<div class="inspection-locked-note">${JOURNAL_VIEW_ONLY_MESSAGE}</div>`
+        : locked
+          ? `<div class="inspection-locked-note">결재가 진행되어 이 점검표는 읽기 전용입니다. 다시 수정하려면 시스템관리자의 결재 리셋이 필요합니다.</div>`
+          : ""
+    }
 
     <div class="approval-bar" id="approvalBar"></div>
 
@@ -666,7 +698,8 @@ function showModalError(err) {
 
 function renderInspectionApprovalBar() {
   renderApprovalBar(document.getElementById("approvalBar"), modalState, {
-    allowApprove: modalState.id !== null, // 저장 전 문서는 결재할 수 없다
+    allowApprove: modalState.id !== null && !isViewOnlyDoc(), // 저장 전 문서·담당이 아닌 장비는 결재할 수 없다
+    allowCancel: !isViewOnlyDoc(),
     onApprove: approveLevel,
     onCancel: cancelApproval,
   });
@@ -812,6 +845,7 @@ function renderInspectionTable() {
 // 결재 전 자동 저장에서도 부르므로, 성공하면 true를 돌려준다(confirmBeforeApprove 참고).
 // askConfirm=false면 이미 사용자에게 물어본 흐름이라 확인창을 건너뛴다.
 async function saveInspectionLog({ askConfirm = true, closeAfter = true } = {}) {
+  if (isViewOnlyDoc()) return false; // 담당이 아닌 장비는 조회만(저장 버튼도 없다)
   if (askConfirm && !window.confirm("저장하시겠습니까?")) return false;
 
   const opinion = document.getElementById("opinionTextarea").value;
