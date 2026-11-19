@@ -367,14 +367,9 @@ function renderEquipmentList() {
     .filter((e) => !buildingName || e.buildingName === buildingName)
     .filter((e) => !status || e.status === status)
     .filter((e) => !search || e.name.toLowerCase().includes(search))
-    // 지구 → 시설동 → 장비명 순 — 실시간 현황·자료 조회·조직 관리와 같은 기준이다
-    // (compareRegion은 common/js/ui.js. 지구 표기가 "A 지구"처럼 바뀌어도 가나다순으로 따라간다)
-    .sort(
-      (a, b) =>
-        compareRegion(a.region, b.region) ||
-        a.buildingName.localeCompare(b.buildingName, "ko") ||
-        a.name.localeCompare(b.name, "ko")
-    );
+    // 건물번호 순(숫자 크기) → 지구 → 시설동 → 장비명 — 2026-11-19 고객사 요청("법정냉동기 현황" 엑셀과 같은 순서).
+    // 건물번호가 없는 장비는 맨 뒤. 가동율 화면과 같은 기준이다(compareEquipmentOrder, common/js/ui.js).
+    .sort((a, b) => compareEquipmentOrder(a, b));
 
   const tbody = document.getElementById("equipmentListBody");
   if (rows.length === 0) {

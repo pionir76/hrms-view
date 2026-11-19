@@ -207,6 +207,42 @@ function compareRegion(a, b) {
   return String(a ?? "").localeCompare(String(b ?? ""), "ko");
 }
 
+// ---------- 건물번호 순 정렬 ----------
+//
+// 장비 목록(장비 관리·가동율)은 건물번호 순이다(2026-11-19 고객사 요청 — "남양연구소 법정냉동기 현황" 엑셀과 같은 순서).
+// 건물번호는 "A-4", "A1-17", "C5-14"처럼 생겨서 글자순으로 비교하면 C1-10이 C1-2보다 앞에 온다 —
+// 지구 글자 다음의 숫자들을 숫자 크기로 비교한다: "A-4" → [A, 0, 4], "A1-17" → [A, 1, 17], "C5-6-1" → [C, 5, 6, 1].
+// 건물번호가 없거나 이 형식이 아니면(예: 수소충전소 냉동기) 맨 뒤로 보낸다.
+function buildingNumberSortKey(buildingNumber) {
+  const m = /^([A-Za-z])(\d*)-(\d+(?:-\d+)*)$/.exec(String(buildingNumber ?? "").trim());
+  if (!m) return null;
+  return [m[1].toUpperCase(), Number(m[2] || 0), ...m[3].split("-").map(Number)];
+}
+
+function compareBuildingNumber(a, b) {
+  const ka = buildingNumberSortKey(a);
+  const kb = buildingNumberSortKey(b);
+  if (!ka || !kb) return (ka ? 0 : 1) - (kb ? 0 : 1); // 형식이 없는 쪽이 뒤
+  for (let i = 0; i < Math.max(ka.length, kb.length); i++) {
+    const x = ka[i] ?? -1;
+    const y = kb[i] ?? -1;
+    if (x < y) return -1;
+    if (x > y) return 1;
+  }
+  return 0;
+}
+
+// 장비 목록 공통 순서: 건물번호 → 지구 → 시설동 → 장비명. 한 건물번호에 시설동이 둘인 경우(B1-7)도 있어
+// 시설동으로 한 번 더 나눈다. buildingNumberOf: 건물번호가 다른 곳에 있을 때만 넘긴다(기본은 e.buildingNumber).
+function compareEquipmentOrder(a, b, buildingNumberOf = (e) => e.buildingNumber) {
+  return (
+    compareBuildingNumber(buildingNumberOf(a), buildingNumberOf(b)) ||
+    compareRegion(a.region, b.region) ||
+    String(a.buildingName ?? "").localeCompare(String(b.buildingName ?? ""), "ko") ||
+    String(a.name ?? "").localeCompare(String(b.name ?? ""), "ko")
+  );
+}
+
 // 장비 목록에서 실제로 쓰이는 지구만 뽑아 정렬해서 돌려준다
 function collectRegions(equipments) {
   return [...new Set((equipments || []).map((e) => e.region).filter(Boolean))].sort(compareRegion);

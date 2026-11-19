@@ -152,12 +152,9 @@ async function loadUtilization() {
   }
   if (requestId !== utState.requestId) return;
 
-  equipments = (equipments || []).slice().sort(
-    (a, b) =>
-      compareRegion(a.region, b.region) ||
-      String(a.buildingName).localeCompare(String(b.buildingName), "ko") ||
-      String(a.name).localeCompare(String(b.name), "ko")
-  );
+  // 건물번호 순(숫자 크기) → 지구 → 시설동 → 장비명 — 장비 관리와 같은 기준(2026-11-19 고객사 요청).
+  // 건물번호는 70번 응답에 있다(같은 날 백엔드 추가 — 예전엔 1번 목록을 한 번 더 받았다).
+  equipments = (equipments || []).slice().sort((a, b) => compareEquipmentOrder(a, b));
   utState.rows = equipments.map((equipment) => ({ equipment, result: undefined })); // undefined = 아직, null = 실패
   utState.period = period;
   renderTable();
@@ -205,7 +202,7 @@ function visibleRows() {
   const kw = utState.keyword.toLowerCase();
   let rows = utState.rows;
   if (kw) {
-    rows = rows.filter(({ equipment: e }) => `${e.name} ${e.buildingName} ${e.region}`.toLowerCase().includes(kw));
+    rows = rows.filter(({ equipment: e }) => `${e.name} ${e.buildingName} ${e.region} ${e.buildingNumber ?? ""}`.toLowerCase().includes(kw));
   }
   if (utState.sorted) {
     // 가동율 순 — 기록 없음·조회 중·실패는 항상 맨 아래
@@ -289,7 +286,7 @@ function renderTable() {
         <tr>
           <td>${escapeHtml(e.region)}</td>
           <td>${escapeHtml(e.buildingName)}</td>
-          <td class="ut-name">${escapeHtml(e.name)}</td>
+          <td class="ut-name">${escapeHtml(e.name)}${e.buildingNumber ? `<span class="ut-bn">${escapeHtml(e.buildingNumber)}</span>` : ""}</td>
           <td>${rateCell}</td>
           <td class="num">${runCell}</td>
           <td class="num">${recCell}</td>
@@ -338,7 +335,7 @@ function exportUtilizationPdf() {
       return `<tr>
         <td class="pdf-center">${text(e.region)}</td>
         <td>${text(e.buildingName)}</td>
-        <td>${text(e.name)}</td>
+        <td>${text(e.name)}${e.buildingNumber ? `<span class="ut-pdf-bn">${text(e.buildingNumber)}</span>` : ""}</td>
         <td class="ut-pdf-num"><b>${text(rate)}</b></td>
         <td class="ut-pdf-num">${r ? formatHm(r.runningMinutes) : "-"}</td>
         <td class="ut-pdf-num">${r ? formatHm(r.totalMinutes) : "-"}</td>
